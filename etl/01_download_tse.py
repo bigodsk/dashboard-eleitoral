@@ -40,14 +40,8 @@ ARQUIVOS = {
         ]
         for ano in ANOS
     },
-    "locais_votacao": {
-        ano: [
-            f"{BASE}/local_votacao/local_votacao_{ano}_{UF}.zip",
-            f"{BASE}/local_votacao/local_votacao_{ano}.zip",
-            f"{BASE}/local_votacao_{ano}/local_votacao_{ano}_{UF}.zip",
-        ]
-        for ano in [2022, 2024]
-    },
+    # locais_votacao: endereços extraídos diretamente de votacao_secao
+    # (arquivo separado não disponível no CDN do TSE)
 }
 
 
