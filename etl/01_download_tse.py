@@ -6,7 +6,6 @@ Baixa resultados por seção eleitoral e perfil do eleitorado
 para os anos configurados em data/config.json.
 """
 
-import os
 import json
 import requests
 import zipfile
@@ -19,57 +18,68 @@ CONFIG = json.loads((ROOT / "data" / "config.json").read_text())
 RAW_DIR = ROOT / "data" / "raw"
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-UF = CONFIG["uf"].lower()
+UF = CONFIG["uf"].upper()
 ANOS = CONFIG["anos_disponiveis"]
 
-BASE_URL = "https://cdn.tse.jus.br/estatistica/sead/odsele"
+BASE = "https://cdn.tse.jus.br/estatistica/sead/odsele"
 
+# Cada entrada é uma lista de candidatos de URL tentados em ordem.
+# O TSE muda nomes ocasionalmente; a função tenta todos antes de desistir.
 ARQUIVOS = {
-    # Resultados por seção (deputado estadual e federal)
     "votacao_secao": {
-        2018: f"votacao_secao/votacao_secao_2018_{UF.upper()}.zip",
-        2020: f"votacao_secao/votacao_secao_2020_{UF.upper()}.zip",
-        2022: f"votacao_secao/votacao_secao_2022_{UF.upper()}.zip",
-        2024: f"votacao_secao/votacao_secao_2024_{UF.upper()}.zip",
+        ano: [
+            f"{BASE}/votacao_secao/votacao_secao_{ano}_{UF}.zip",
+        ]
+        for ano in ANOS
     },
-    # Perfil do eleitorado por zona
     "perfil_eleitorado": {
-        2018: "perfil_eleitor_secao/perfil_eleitor_secao_2018.zip",
-        2020: "perfil_eleitor_secao/perfil_eleitor_secao_2020.zip",
-        2022: "perfil_eleitor_secao/perfil_eleitor_secao_2022.zip",
-        2024: "perfil_eleitor_secao/perfil_eleitor_secao_2024.zip",
+        ano: [
+            f"{BASE}/perfil_eleitorado/perfil_eleitorado_{ano}.zip",
+            f"{BASE}/perfil_eleitorado_{ano}/perfil_eleitorado_{ano}_BR.zip",
+            f"{BASE}/perfil_eleitor_secao/perfil_eleitor_secao_{ano}.zip",
+        ]
+        for ano in ANOS
     },
-    # Locais de votação (para geocodificação)
     "locais_votacao": {
-        2022: "local_votacao/local_votacao_2022.zip",
-        2024: "local_votacao/local_votacao_2024.zip",
+        ano: [
+            f"{BASE}/local_votacao/local_votacao_{ano}_{UF}.zip",
+            f"{BASE}/local_votacao/local_votacao_{ano}.zip",
+            f"{BASE}/local_votacao_{ano}/local_votacao_{ano}_{UF}.zip",
+        ]
+        for ano in [2022, 2024]
     },
 }
 
 
-def download_arquivo(url: str, destino: Path) -> bool:
+def tentar_download(candidatos: list[str], destino: Path) -> bool:
     if destino.exists():
         print(f"  Já existe: {destino.name}")
         return True
 
-    print(f"  Baixando: {url}")
-    try:
-        r = requests.get(url, stream=True, timeout=120)
-        r.raise_for_status()
-        total = int(r.headers.get("content-length", 0))
+    for url in candidatos:
+        print(f"  Tentando: {url}")
+        try:
+            r = requests.get(url, stream=True, timeout=120)
+            if r.status_code == 404:
+                print(f"  404, próximo candidato...")
+                continue
+            r.raise_for_status()
+            total = int(r.headers.get("content-length", 0))
+            with open(destino, "wb") as f, tqdm(
+                total=total, unit="B", unit_scale=True, desc=destino.name
+            ) as bar:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    bar.update(len(chunk))
+            print(f"  OK: {url}")
+            return True
+        except Exception as e:
+            print(f"  ERRO: {e}")
+            if destino.exists():
+                destino.unlink()
 
-        with open(destino, "wb") as f, tqdm(
-            total=total, unit="B", unit_scale=True, desc=destino.name
-        ) as bar:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
-                bar.update(len(chunk))
-        return True
-    except Exception as e:
-        print(f"  ERRO ao baixar {url}: {e}")
-        if destino.exists():
-            destino.unlink()
-        return False
+    print(f"  FALHOU: nenhum candidato funcionou para {destino.name}")
+    return False
 
 
 def extrair_zip(zip_path: Path, destino: Path) -> None:
@@ -79,13 +89,12 @@ def extrair_zip(zip_path: Path, destino: Path) -> None:
 
 
 def main():
-    for categoria, anos_urls in ARQUIVOS.items():
+    for categoria, anos_candidatos in ARQUIVOS.items():
         print(f"\n=== {categoria} ===")
         destino_cat = RAW_DIR / categoria
         destino_cat.mkdir(exist_ok=True)
 
-        for ano, caminho_url in anos_urls.items():
-            url = f"{BASE_URL}/{caminho_url}"
+        for ano, candidatos in anos_candidatos.items():
             zip_path = destino_cat / f"{categoria}_{ano}.zip"
             pasta_extraida = destino_cat / str(ano)
 
@@ -93,12 +102,12 @@ def main():
                 print(f"  [{ano}] Já extraído, pulando.")
                 continue
 
-            ok = download_arquivo(url, zip_path)
+            ok = tentar_download(candidatos, zip_path)
             if ok:
                 pasta_extraida.mkdir(exist_ok=True)
                 extrair_zip(zip_path, pasta_extraida)
                 zip_path.unlink()
-                print(f"  [{ano}] OK")
+                print(f"  [{ano}] Extraído.")
 
     print("\nDownload concluído. Dados em data/raw/")
 
