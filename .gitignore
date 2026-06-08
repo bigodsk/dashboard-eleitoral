@@ -1,0 +1,12 @@
+data/raw/
+__pycache__/
+*.pyc
+.env
+node_modules/
+.DS_Store
+*.zip
+*.csv.gz
+*.egg-info/
+.venv/
+venv/
+etl/.cache/

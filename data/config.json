@@ -1,0 +1,18 @@
+{
+  "campo_progressista": ["PSOL", "PT", "REDE", "PCdoB", "UP", "PSTU"],
+  "partido_foco": "PSOL",
+  "municipio_foco": "Campinas",
+  "codigo_municipio_tse": "61965",
+  "uf": "SP",
+  "anos_disponiveis": [2018, 2020, 2022, 2024],
+  "score_pesos": {
+    "eleitores_potenciais": 0.30,
+    "crescimento_campo": 0.30,
+    "taxa_abstencao": 0.20,
+    "pct_jovens_18_34": 0.20
+  },
+  "classificacao_thresholds": {
+    "consolidar": 75,
+    "crescer": 55
+  }
+}
