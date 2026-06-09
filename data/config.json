@@ -4,7 +4,7 @@
   "municipio_foco": "Campinas",
   "codigo_municipio_tse": "62910",
   "uf": "SP",
-  "anos_disponiveis": [2018, 2020, 2022, 2024],
+  "anos_disponiveis": [2018, 2022],
   "score_pesos": {
     "eleitores_potenciais": 0.30,
     "crescimento_campo": 0.30,
