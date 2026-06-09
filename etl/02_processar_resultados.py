@@ -1,7 +1,6 @@
 """
 Processa os resultados eleitorais brutos do TSE para Campinas.
-Filtra por município, agrega por zona eleitoral e seção,
-calcula métricas do campo progressista.
+Usa leitura em chunks para lidar com os arquivos grandes do TSE-SP.
 
 Saída:
   data/resultados/resultados_ze_{ano}.csv
@@ -12,7 +11,6 @@ Saída:
 import json
 import pandas as pd
 from pathlib import Path
-from tqdm import tqdm
 
 ROOT = Path(__file__).parent.parent
 CONFIG = json.loads((ROOT / "data" / "config.json").read_text())
@@ -22,17 +20,16 @@ OUT_DIR = ROOT / "data" / "resultados"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 MUNICIPIO_COD = CONFIG["codigo_municipio_tse"]
-CAMPO = CONFIG["campo_progressista"]
+CAMPO = [p.upper() for p in CONFIG["campo_progressista"]]
 ANOS = CONFIG["anos_disponiveis"]
 
-CARGO_DEP_ESTADUAL = "Deputado Estadual"
-CARGO_DEP_FEDERAL = "Deputado Federal"
-CARGO_VEREADOR = "Vereador"
+CHUNK_SIZE = 50_000  # linhas por chunk — equilibra velocidade e memória
 
-COLUNAS_RESULTADO = {
+RENAME = {
     "NR_ZONA": "zona",
     "NR_SECAO": "secao",
     "NM_PARTIDO": "partido",
+    "DS_CARGO_PERGUNTA": "cargo",
     "DS_CARGO": "cargo",
     "QT_VOTOS_NOMINAIS": "votos_nominais",
     "QT_VOTOS_BRANCOS": "votos_brancos",
@@ -43,111 +40,197 @@ COLUNAS_RESULTADO = {
 }
 
 
-def carregar_csv_tse(path: Path) -> pd.DataFrame:
-    encodings = ["latin-1", "iso-8859-1", "utf-8"]
-    for enc in encodings:
+def detectar_encoding(path: Path) -> str:
+    for enc in ["latin-1", "iso-8859-1", "utf-8"]:
         try:
-            df = pd.read_csv(path, sep=";", encoding=enc, dtype=str, low_memory=False)
-            return df
-        except Exception:
+            with open(path, encoding=enc) as f:
+                f.read(4096)
+            return enc
+        except UnicodeDecodeError:
             continue
-    raise ValueError(f"Não foi possível ler: {path}")
+    return "latin-1"
 
 
-def filtrar_municipio(df: pd.DataFrame, cod: str) -> pd.DataFrame:
-    col = next((c for c in df.columns if "CD_MUNICIPIO" in c or "NR_MUNICIPIO" in c), None)
-    if col:
-        return df[df[col].str.strip() == str(cod)].copy()
-    nm_col = next((c for c in df.columns if "NM_MUNICIPIO" in c), None)
-    if nm_col:
-        return df[df[nm_col].str.upper().str.contains("CAMPINAS")].copy()
-    return df
+def detectar_col_municipio(header: list[str]) -> str | None:
+    for c in header:
+        if "CD_MUNICIPIO" in c or "NR_MUNICIPIO" in c:
+            return c
+    for c in header:
+        if "NM_MUNICIPIO" in c:
+            return c
+    return None
+
+
+def ler_campinas_chunks(csv_path: Path) -> pd.DataFrame:
+    enc = detectar_encoding(csv_path)
+    tamanho_mb = csv_path.stat().st_size / 1_048_576
+
+    # Lê primeira linha para detectar coluna de município
+    header_df = pd.read_csv(csv_path, sep=";", encoding=enc, nrows=0, dtype=str)
+    col_mun = detectar_col_municipio(list(header_df.columns))
+
+    chunks_campinas = []
+    total_linhas = 0
+
+    print(f"  Lendo {csv_path.name} ({tamanho_mb:.0f} MB) em chunks...")
+
+    reader = pd.read_csv(
+        csv_path, sep=";", encoding=enc,
+        dtype=str, low_memory=False,
+        chunksize=CHUNK_SIZE,
+    )
+
+    for chunk in reader:
+        total_linhas += len(chunk)
+
+        if col_mun:
+            if "CD_MUNICIPIO" in col_mun or "NR_MUNICIPIO" in col_mun:
+                mask = chunk[col_mun].str.strip() == MUNICIPIO_COD
+            else:
+                mask = chunk[col_mun].str.upper().str.contains("CAMPINAS", na=False)
+            campinas = chunk[mask]
+        else:
+            campinas = chunk
+
+        if not campinas.empty:
+            chunks_campinas.append(campinas)
+
+        # Progresso a cada 500k linhas
+        if total_linhas % 500_000 < CHUNK_SIZE:
+            print(f"    {total_linhas:,} linhas lidas, {sum(len(c) for c in chunks_campinas):,} de Campinas")
+
+    print(f"  Total: {total_linhas:,} linhas → {sum(len(c) for c in chunks_campinas):,} de Campinas")
+
+    if not chunks_campinas:
+        return pd.DataFrame()
+    return pd.concat(chunks_campinas, ignore_index=True)
 
 
 def processar_ano(ano: int) -> None:
     pasta = RAW_DIR / str(ano)
     if not pasta.exists():
-        print(f"[{ano}] Dados brutos não encontrados em {pasta}. Execute 01_download_tse.py")
+        print(f"[{ano}] Pasta não encontrada. Execute 01_download_tse.py")
         return
 
-    csvs = list(pasta.glob("*.csv"))
-    if not csvs:
-        csvs = list(pasta.glob("**/*.csv"))
-
+    csvs = list(pasta.glob("*.csv")) or list(pasta.glob("**/*.csv"))
     if not csvs:
         print(f"[{ano}] Nenhum CSV encontrado.")
         return
 
     frames = []
-    for csv in tqdm(csvs, desc=f"[{ano}] Carregando CSVs"):
-        df = carregar_csv_tse(csv)
-        df = filtrar_municipio(df, MUNICIPIO_COD)
+    for csv in csvs:
+        df = ler_campinas_chunks(csv)
         if not df.empty:
             frames.append(df)
 
     if not frames:
-        print(f"[{ano}] Nenhum dado para Campinas ({MUNICIPIO_COD}).")
+        print(f"[{ano}] Nenhum dado para Campinas (código {MUNICIPIO_COD}).")
         return
 
     df = pd.concat(frames, ignore_index=True)
 
-    colunas_presentes = {k: v for k, v in COLUNAS_RESULTADO.items() if k in df.columns}
-    df = df.rename(columns=colunas_presentes)
+    # Renomear colunas — preserva primeiro match (DS_CARGO tem precedência sobre DS_CARGO_PERGUNTA)
+    rename_map = {}
+    for orig, dest in RENAME.items():
+        if orig in df.columns and dest not in rename_map.values():
+            rename_map[orig] = dest
+    df = df.rename(columns=rename_map)
 
-    cols_num = ["votos_nominais", "votos_brancos", "votos_nulos",
-                "eleitores_aptos", "comparecimento", "abstencoes"]
-    for c in cols_num:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0).astype(int)
+    # Converter numéricos
+    for col in ["votos_nominais", "votos_brancos", "votos_nulos",
+                "eleitores_aptos", "comparecimento", "abstencoes"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
 
     if "partido" in df.columns:
         df["partido"] = df["partido"].str.strip().str.upper()
-        df["campo"] = df["partido"].isin([p.upper() for p in CAMPO])
+        df["campo"] = df["partido"].isin(CAMPO)
 
     df["ano"] = ano
 
+    # Filtrar deputado estadual
     if "cargo" in df.columns:
-        df_dep = df[df["cargo"].str.upper().str.contains("DEPUTADO ESTADUAL", na=False)]
+        df_dep = df[df["cargo"].str.upper().str.contains("DEPUTADO ESTADUAL", na=False)].copy()
+        if df_dep.empty:
+            print(f"[{ano}] Aviso: nenhuma linha com cargo 'Deputado Estadual'. Usando todos os cargos.")
+            df_dep = df
     else:
         df_dep = df
 
-    # Agregação por zona eleitoral
-    if "zona" in df_dep.columns:
-        agg_ze = df_dep.groupby("zona").agg(
+    if "zona" not in df_dep.columns:
+        print(f"[{ano}] Coluna 'zona' não encontrada. Verifique o CSV.")
+        return
+
+    # ── Agregar por Zona Eleitoral ──
+    def soma_campo(grp):
+        if "campo" in df_dep.columns:
+            return grp.loc[df_dep.loc[grp.index, "campo"], "votos_nominais"].sum()
+        return 0
+
+    agg_ze = (
+        df_dep
+        .groupby("zona", as_index=False)
+        .agg(
             eleitores_aptos=("eleitores_aptos", "first"),
             comparecimento=("comparecimento", "first"),
             abstencoes=("abstencoes", "first"),
-            votos_campo=("votos_nominais", lambda x: x[df_dep.loc[x.index, "campo"]].sum() if "campo" in df_dep.columns else 0),
             votos_total=("votos_nominais", "sum"),
-        ).reset_index()
+        )
+    )
 
-        agg_ze["abstencao_pct"] = (
-            agg_ze["abstencoes"] / agg_ze["eleitores_aptos"].replace(0, pd.NA) * 100
-        ).round(2)
-        agg_ze["campo_pct"] = (
-            agg_ze["votos_campo"] / agg_ze["votos_total"].replace(0, pd.NA) * 100
-        ).round(2)
-        agg_ze["ano"] = ano
+    # votos do campo por zona
+    campo_por_zona = (
+        df_dep[df_dep["campo"]]
+        .groupby("zona")["votos_nominais"]
+        .sum()
+        .rename("votos_campo")
+        .reset_index()
+    ) if "campo" in df_dep.columns else pd.DataFrame(columns=["zona", "votos_campo"])
 
-        out = OUT_DIR / f"resultados_ze_{ano}.csv"
-        agg_ze.to_csv(out, index=False, encoding="utf-8")
-        print(f"[{ano}] ZEs salvas: {out.name} ({len(agg_ze)} zonas)")
+    agg_ze = agg_ze.merge(campo_por_zona, on="zona", how="left")
+    agg_ze["votos_campo"] = agg_ze["votos_campo"].fillna(0).astype(int)
 
-        # Agregação por seção
-        if "secao" in df_dep.columns:
-            agg_sec = df_dep.groupby(["zona", "secao"]).agg(
+    agg_ze["abstencao_pct"] = (
+        agg_ze["abstencoes"] / agg_ze["eleitores_aptos"].replace(0, pd.NA) * 100
+    ).round(2)
+    agg_ze["campo_pct"] = (
+        agg_ze["votos_campo"] / agg_ze["votos_total"].replace(0, pd.NA) * 100
+    ).round(2)
+    agg_ze["ano"] = ano
+
+    out_ze = OUT_DIR / f"resultados_ze_{ano}.csv"
+    agg_ze.to_csv(out_ze, index=False, encoding="utf-8")
+    print(f"[{ano}] ZEs: {out_ze.name} ({len(agg_ze)} zonas)")
+
+    # ── Agregar por Seção ──
+    if "secao" in df_dep.columns:
+        agg_sec = (
+            df_dep
+            .groupby(["zona", "secao"], as_index=False)
+            .agg(
                 eleitores_aptos=("eleitores_aptos", "first"),
-                votos_campo=("votos_nominais", lambda x: x[df_dep.loc[x.index, "campo"]].sum() if "campo" in df_dep.columns else 0),
                 votos_total=("votos_nominais", "sum"),
-            ).reset_index()
-            agg_sec["campo_pct"] = (
-                agg_sec["votos_campo"] / agg_sec["votos_total"].replace(0, pd.NA) * 100
-            ).round(2)
-            agg_sec["ano"] = ano
+            )
+        )
 
-            out_sec = OUT_DIR / f"resultados_secoes_{ano}.csv"
-            agg_sec.to_csv(out_sec, index=False, encoding="utf-8")
-            print(f"[{ano}] Seções salvas: {out_sec.name} ({len(agg_sec)} seções)")
+        campo_por_secao = (
+            df_dep[df_dep["campo"]]
+            .groupby(["zona", "secao"])["votos_nominais"]
+            .sum()
+            .rename("votos_campo")
+            .reset_index()
+        ) if "campo" in df_dep.columns else pd.DataFrame(columns=["zona", "secao", "votos_campo"])
+
+        agg_sec = agg_sec.merge(campo_por_secao, on=["zona", "secao"], how="left")
+        agg_sec["votos_campo"] = agg_sec["votos_campo"].fillna(0).astype(int)
+        agg_sec["campo_pct"] = (
+            agg_sec["votos_campo"] / agg_sec["votos_total"].replace(0, pd.NA) * 100
+        ).round(2)
+        agg_sec["ano"] = ano
+
+        out_sec = OUT_DIR / f"resultados_secoes_{ano}.csv"
+        agg_sec.to_csv(out_sec, index=False, encoding="utf-8")
+        print(f"[{ano}] Seções: {out_sec.name} ({len(agg_sec)} seções)")
 
 
 def gerar_serie_historica() -> None:
@@ -155,37 +238,39 @@ def gerar_serie_historica() -> None:
     for ano in ANOS:
         f = OUT_DIR / f"resultados_ze_{ano}.csv"
         if f.exists():
-            df = pd.read_csv(f)
-            frames.append(df)
+            frames.append(pd.read_csv(f))
 
     if not frames:
-        print("Nenhum dado de ZE encontrado para gerar série histórica.")
+        print("Nenhum dado de ZE para série histórica.")
         return
 
-    df_hist = pd.concat(frames, ignore_index=True)
-
-    serie = df_hist.groupby("ano").agg(
-        votos_campo=("votos_campo", "sum"),
-        votos_total=("votos_total", "sum"),
-        eleitores_aptos=("eleitores_aptos", "sum"),
-        abstencoes=("abstencoes", "sum"),
-    ).reset_index()
+    df = pd.concat(frames, ignore_index=True)
+    serie = (
+        df.groupby("ano", as_index=False)
+        .agg(
+            votos_campo=("votos_campo", "sum"),
+            votos_total=("votos_total", "sum"),
+            eleitores_aptos=("eleitores_aptos", "sum"),
+            abstencoes=("abstencoes", "sum"),
+        )
+    )
     serie["campo_pct"] = (serie["votos_campo"] / serie["votos_total"].replace(0, pd.NA) * 100).round(2)
     serie["abstencao_pct"] = (serie["abstencoes"] / serie["eleitores_aptos"].replace(0, pd.NA) * 100).round(2)
 
     out = OUT_DIR / "serie_historica_campo.csv"
     serie.to_csv(out, index=False, encoding="utf-8")
-    print(f"Série histórica salva: {out.name}")
+    print(f"Série histórica: {out.name}")
 
 
 def main():
     print("=== Processando resultados eleitorais ===\n")
     for ano in ANOS:
+        print(f"\n--- {ano} ---")
         processar_ano(ano)
 
-    print("\n=== Gerando série histórica ===")
+    print("\n=== Série histórica ===")
     gerar_serie_historica()
-    print("\nProcessamento concluído.")
+    print("\nConcluído.")
 
 
 if __name__ == "__main__":
