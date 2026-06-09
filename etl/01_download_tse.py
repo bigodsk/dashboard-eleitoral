@@ -1,13 +1,13 @@
 """
 Download e filtragem inline dos dados do TSE para Campinas-SP.
 
-O arquivo de SP tem ~500 MB. Este script baixa para um arquivo temporário,
-lê o CSV interno em chunks e salva apenas as linhas de Campinas (~5 MB).
-O zip temporário é apagado logo após a extração.
+Fontes:
+- votacao_partido_munzona: votos por partido por zona (arquivo principal)
+- votacao_secao: usado só para geocodificação dos locais de votação
+- perfil_eleitorado: perfil demográfico do eleitorado por zona
 
-Saída:
-  data/raw/campinas/votacao_secao_{ano}.csv
-  data/raw/campinas/perfil_eleitorado_{ano}.csv
+Cada zip é baixado, o CSV do SP é extraído, filtrado para Campinas
+e salvo pequeno em data/raw/campinas/. O zip é descartado.
 """
 
 import json
@@ -32,11 +32,20 @@ BASE = "https://cdn.tse.jus.br/estatistica/sead/odsele"
 
 CHUNK = 50_000
 
+# Mapeamento: nome_saida → lista de candidatos de URL (tenta em ordem)
+# {ano} e {UF} são substituídos em tempo de execução
 FONTES = {
+    # Principal: votos agregados por partido e zona — tem SG_PARTIDO, NM_PARTIDO
+    "votacao_partido_munzona": {
+        ano: [f"{BASE}/votacao_partido_munzona/votacao_partido_munzona_{ano}.zip"]
+        for ano in ANOS
+    },
+    # Geocodificação: endereços dos locais de votação
     "votacao_secao": {
         ano: [f"{BASE}/votacao_secao/votacao_secao_{ano}_{UF}.zip"]
         for ano in ANOS
     },
+    # Perfil demográfico do eleitorado
     "perfil_eleitorado": {
         ano: [
             f"{BASE}/perfil_eleitorado/perfil_eleitorado_{ano}.zip",
@@ -46,64 +55,58 @@ FONTES = {
     },
 }
 
+# Arquivos que já foram baixados na sessão anterior — pular se existirem
+SKIP_SE_EXISTIR = True
+
 
 def baixar_para_temp(url: str) -> str | None:
-    """Baixa URL para arquivo temporário; retorna o caminho ou None se 404."""
     try:
-        r = requests.get(url, stream=True, timeout=120)
+        r = requests.get(url, stream=True, timeout=180)
         if r.status_code == 404:
             return None
         r.raise_for_status()
         total = int(r.headers.get("content-length", 0))
-        suffix = Path(url).suffix or ".zip"
-        fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+        fd, tmp = tempfile.mkstemp(suffix=".zip")
         with os.fdopen(fd, "wb") as f, tqdm(
             total=total, unit="B", unit_scale=True,
             desc=f"  {Path(url).name}", leave=False
         ) as bar:
-            for chunk in r.iter_content(chunk_size=65_536):
+            for chunk in r.iter_content(65_536):
                 f.write(chunk)
                 bar.update(len(chunk))
-        return tmp_path
+        return tmp
     except Exception as e:
-        print(f"  Erro ao baixar {url}: {e}")
+        print(f"  Erro: {e}")
         return None
 
 
-def detectar_col_municipio(colunas: list) -> tuple[str, str]:
-    """Retorna (nome_coluna, tipo) onde tipo é 'codigo' ou 'nome'."""
-    for c in colunas:
-        if "CD_MUNICIPIO" in c or "NR_MUNICIPIO" in c:
-            return c, "codigo"
-    for c in colunas:
-        if "NM_MUNICIPIO" in c or "NM_UE" in c:
-            return c, "nome"
-    return None, None
-
-
 def filtrar_campinas(chunk: pd.DataFrame) -> pd.DataFrame:
-    col, tipo = detectar_col_municipio(list(chunk.columns))
-    if col is None:
-        return chunk  # sem coluna de município: mantém tudo
-    if tipo == "codigo":
-        return chunk[chunk[col].str.strip() == MUNICIPIO_COD]
-    return chunk[chunk[col].str.upper().str.contains("CAMPINAS", na=False)]
+    for col in chunk.columns:
+        if "CD_MUNICIPIO" in col or "NR_MUNICIPIO" in col:
+            return chunk[chunk[col].str.strip() == MUNICIPIO_COD]
+    for col in chunk.columns:
+        if "NM_MUNICIPIO" in col:
+            return chunk[chunk[col].str.upper().str.contains("CAMPINAS", na=False)]
+    return chunk
 
 
-def extrair_e_filtrar_zip(zip_path: str, out_csv: Path) -> bool:
-    """Abre o zip, lê cada CSV em chunks, filtra Campinas, salva."""
+def extrair_filtrar_salvar(zip_path: str, out_csv: Path, categoria: str) -> bool:
     frames = []
     try:
         with zipfile.ZipFile(zip_path) as zf:
-            csvs_no_zip = [n for n in zf.namelist() if n.lower().endswith(".csv")]
-            if not csvs_no_zip:
-                print("  Nenhum CSV dentro do zip.")
+            # Preferir CSV do SP quando existir dentro do zip
+            todos_csvs = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+            sp_csvs = [n for n in todos_csvs if f"_{UF}." in n or f"_{UF.lower()}." in n]
+            csvs = sp_csvs if sp_csvs else todos_csvs
+
+            if not csvs:
+                print("  Nenhum CSV no zip.")
                 return False
 
-            for nome in csvs_no_zip:
+            for nome in csvs:
                 print(f"  Filtrando: {nome}")
                 with zf.open(nome) as f:
-                    for enc in ["latin-1", "iso-8859-1", "utf-8"]:
+                    for enc in ["latin-1", "utf-8", "iso-8859-1"]:
                         try:
                             reader = pd.read_csv(
                                 f, sep=";", encoding=enc,
@@ -121,60 +124,54 @@ def extrair_e_filtrar_zip(zip_path: str, out_csv: Path) -> bool:
                         except Exception as e:
                             print(f"  Erro ao ler {nome}: {e}")
                             break
+
     except zipfile.BadZipFile as e:
-        print(f"  Zip corrompido: {e}")
+        print(f"  Zip inválido: {e}")
         return False
 
     if not frames:
-        print("  Nenhum dado de Campinas encontrado neste arquivo.")
+        print("  Nenhuma linha de Campinas encontrada.")
         return False
 
     df = pd.concat(frames, ignore_index=True)
     df.to_csv(out_csv, index=False, encoding="utf-8")
-    print(f"  Salvo: {out_csv.name} ({len(df):,} linhas de Campinas)")
+    print(f"  Salvo: {out_csv.name} ({len(df):,} linhas)")
     return True
 
 
 def processar_fonte(categoria: str, anos_candidatos: dict) -> None:
     print(f"\n=== {categoria} ===")
-
     for ano, candidatos in anos_candidatos.items():
         out_csv = OUT_DIR / f"{categoria}_{ano}.csv"
 
-        if out_csv.exists():
-            print(f"  [{ano}] Já existe: {out_csv.name} — pulando.")
+        if SKIP_SE_EXISTIR and out_csv.exists():
+            print(f"  [{ano}] Já existe ({out_csv.stat().st_size // 1024} KB) — pulando.")
             continue
 
         print(f"\n  [{ano}]")
-        tmp_path = None
-
         for url in candidatos:
             print(f"  Baixando: {url}")
-            tmp_path = baixar_para_temp(url)
-            if tmp_path:
-                print(f"  Download OK. Extraindo e filtrando...")
-                ok = extrair_e_filtrar_zip(tmp_path, out_csv)
-                os.unlink(tmp_path)
-                tmp_path = None
-                if ok:
-                    break
-                # Se filtrou mas não achou Campinas, tenta próximo candidato
-            else:
-                print(f"  404 ou erro, próximo candidato...")
-
-        if not out_csv.exists():
+            tmp = baixar_para_temp(url)
+            if tmp is None:
+                print("  404 ou erro, próximo candidato...")
+                continue
+            ok = extrair_filtrar_salvar(tmp, out_csv, categoria)
+            os.unlink(tmp)
+            if ok:
+                break
+        else:
             print(f"  [{ano}] FALHOU: nenhum candidato funcionou.")
 
 
 def main():
-    print("Pipeline: download → filtrar Campinas → salvar CSV pequeno\n")
-    print(f"Município: Campinas (código {MUNICIPIO_COD})\n")
+    print(f"Município: Campinas (TSE {MUNICIPIO_COD}) — UF: {UF}\n")
+    print("Cada zip é baixado, filtrado e descartado. Apenas dados de Campinas são salvos.\n")
 
     for categoria, anos in FONTES.items():
         processar_fonte(categoria, anos)
 
-    print(f"\nConcluído. Arquivos filtrados em: {OUT_DIR}")
-    print("Execute agora: python etl/02_processar_resultados.py")
+    print(f"\nConcluído. Arquivos em: {OUT_DIR}")
+    print("Próximo passo: python etl/02_processar_resultados.py")
 
 
 if __name__ == "__main__":
