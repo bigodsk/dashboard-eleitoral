@@ -74,15 +74,16 @@ const ModuloPerfil = (() => {
         document.getElementById('perfil-metrics').innerHTML = `
           <div class="metric-card" style="grid-column:1/-1">
             <div class="metric-label">Dados não disponíveis</div>
-            <div class="metric-value" style="font-size:14px;color:var(--texto-secundario)">Execute os scripts ETL 04_cruzar_perfil_ze.py para carregar os dados de perfil.</div>
+            <div class="metric-value" style="font-size:14px;color:var(--texto-secundario)">Execute o script ETL para carregar os dados de perfil.</div>
           </div>`;
         return;
       }
 
+      const escAgregado = computeEscAgg(ze);
       renderMetrics(geral[0] || {});
       renderSexo(geral[0] || {});
       renderIdade(ze);
-      renderEscolaridade(geral[0] || {});
+      renderEscolaridade(escAgregado);
       renderJovensZE(ze);
 
     } catch (err) {
@@ -179,6 +180,22 @@ const ModuloPerfil = (() => {
     const values = cols.map(c => Number(geral[c]) || 0);
 
     Charts.horizontalBar(ctx, labels, values, '#7C3AED');
+  }
+
+  function computeEscAgg(ze) {
+    if (!ze.length) return {};
+    const escCols = Object.keys(ze[0]).filter(k => k.startsWith('esc_'));
+    const totalEleit = ze.reduce((s, d) => s + (Number(d.total_eleitores) || 0), 0);
+    if (!totalEleit || !escCols.length) return {};
+    const result = {};
+    for (const col of escCols) {
+      const weighted = ze.reduce((s, d) => {
+        const eleit = Number(d.total_eleitores) || 0;
+        return s + (Number(d[col]) || 0) * eleit;
+      }, 0);
+      result[col] = Number((weighted / totalEleit).toFixed(1));
+    }
+    return result;
   }
 
   function renderJovensZE(ze) {

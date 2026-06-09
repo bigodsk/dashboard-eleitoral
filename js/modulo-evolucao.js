@@ -1,33 +1,24 @@
 const ModuloEvolucao = (() => {
   async function render(container, config) {
-    const anos = config.anos_disponiveis;
-
     container.innerHTML = `
       <div class="page-header">
-        <div class="page-title">Evolução Temporal</div>
-        <div class="page-subtitle">O campo está crescendo? Onde avançamos ou perdemos?</div>
+        <div class="page-title">Comparativo 2022 × 2024</div>
+        <div class="page-subtitle">Dep. Estadual (2022) vs Vereadora (2024) — desempenho por Zona Eleitoral</div>
       </div>
       <div class="page-body">
 
-        <div class="filters-bar">
-          <div class="filter-group">
-            <label class="filter-label">Comparar</label>
-            <select class="filter-select" id="ev-ano-ini" style="min-width:90px"></select>
-          </div>
-          <span style="padding-top:20px;color:var(--texto-secundario)">→</span>
-          <div class="filter-group">
-            <label class="filter-label">&nbsp;</label>
-            <select class="filter-select" id="ev-ano-fim" style="min-width:90px"></select>
-          </div>
+        <div class="disclaimer" style="margin-bottom:20px">
+          <span class="disclaimer-icon">⚠</span>
+          <span>2022 = Deputada Estadual (eleição estadual); 2024 = Vereadora (eleição municipal). São cargos diferentes — a queda no % do campo reflete a dinâmica própria de cada disputa, não necessariamente perda de base.</span>
         </div>
 
         <div class="content-card" style="margin-bottom:20px">
           <div class="content-card-header">
-            <span class="content-card-title">% do Campo Progressista em Campinas — Série Histórica</span>
+            <span class="content-card-title">% Campo Progressista por Zona — 2022 Dep.Est. vs 2024 Vereador</span>
           </div>
           <div class="content-card-body">
             <div class="chart-container-tall">
-              <canvas id="chart-ev-serie"></canvas>
+              <canvas id="chart-ev-campo-ze"></canvas>
             </div>
           </div>
         </div>
@@ -35,205 +26,162 @@ const ModuloEvolucao = (() => {
         <div class="two-col" style="margin-bottom:20px">
           <div class="content-card">
             <div class="content-card-header">
-              <span class="content-card-title">Variação por Zona (Δ Campo %)</span>
+              <span class="content-card-title">Ediane Maria — Votos por Zona (2022)</span>
             </div>
             <div class="content-card-body">
-              <div class="chart-container-tall">
-                <canvas id="chart-ev-variacao"></canvas>
+              <div class="chart-container">
+                <canvas id="chart-ev-ediane"></canvas>
               </div>
             </div>
           </div>
-          <div>
-            <div class="content-card" style="margin-bottom:20px">
-              <div class="content-card-header">
-                <span class="content-card-title">Maior Crescimento</span>
-              </div>
-              <div class="content-card-body" id="ev-top-crescimento">
-                <div class="loading-overlay"><div class="spinner"></div></div>
-              </div>
+          <div class="content-card">
+            <div class="content-card-header">
+              <span class="content-card-title">Thamy do Mandela — Votos por Zona (2024)</span>
             </div>
-            <div class="content-card">
-              <div class="content-card-header">
-                <span class="content-card-title">Maior Queda</span>
-              </div>
-              <div class="content-card-body" id="ev-top-queda">
-                <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="content-card-body">
+              <div class="chart-container">
+                <canvas id="chart-ev-thamy"></canvas>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="content-card" style="margin-bottom:20px">
-          <div class="content-card-header">
-            <span class="content-card-title">Mapa — Variação do Campo Progressista</span>
+        <div class="two-col" style="margin-bottom:20px">
+          <div class="content-card">
+            <div class="content-card-header">
+              <span class="content-card-title">Top Zonas — Ediane 2022</span>
+            </div>
+            <div class="content-card-body" id="ev-rank-ediane">
+              <div class="loading-overlay"><div class="spinner"></div></div>
+            </div>
           </div>
-          <div style="padding:0">
-            <div class="map-container" id="map-evolucao"></div>
+          <div class="content-card">
+            <div class="content-card-header">
+              <span class="content-card-title">Top Zonas — Thamy 2024</span>
+            </div>
+            <div class="content-card-body" id="ev-rank-thamy">
+              <div class="loading-overlay"><div class="spinner"></div></div>
+            </div>
           </div>
         </div>
 
         <div class="disclaimer">
           <span class="disclaimer-icon">⚠</span>
-          <span>Os cruzamentos entre resultado eleitoral e perfil demográfico são correlações territoriais, não vínculos individuais. Use como orientação estratégica.</span>
+          <span>Os cruzamentos são correlações territoriais por zona eleitoral. O TSE não divulga para quem cada eleitor votou.</span>
         </div>
       </div>
     `;
 
-    const selectIni = document.getElementById('ev-ano-ini');
-    const selectFim = document.getElementById('ev-ano-fim');
-
-    anos.forEach((ano, i) => {
-      const o1 = document.createElement('option');
-      o1.value = ano; o1.textContent = ano;
-      if (i === 0) o1.selected = true;
-      selectIni.appendChild(o1);
-
-      const o2 = document.createElement('option');
-      o2.value = ano; o2.textContent = ano;
-      if (i === anos.length - 1) o2.selected = true;
-      selectFim.appendChild(o2);
-    });
-
-    const MapInst = MapModule.createMap('map-evolucao');
-
-    await loadAll(anos[0], anos[anos.length - 1], anos, MapInst);
-
-    const reload = () => {
-      const ini = parseInt(selectIni.value);
-      const fim = parseInt(selectFim.value);
-      if (ini >= fim) return;
-      loadAll(ini, fim, anos, MapInst);
-    };
-
-    selectIni.addEventListener('change', reload);
-    selectFim.addEventListener('change', reload);
-  }
-
-  async function loadAll(anoIni, anoFim, todos, map) {
     await Promise.all([
-      renderSerie(todos),
-      renderVariacao(anoIni, anoFim, map),
+      renderCampoZE(),
+      renderCandidatas(),
     ]);
   }
 
-  async function renderSerie(anos) {
-    const ctx = document.getElementById('chart-ev-serie');
+  async function renderCampoZE() {
+    const ctx = document.getElementById('chart-ev-campo-ze');
     if (!ctx) return;
-
     try {
-      const serie = await Utils.loadCSV('data/resultados/serie_historica_campo.csv');
-      if (!serie.length) throw new Error('vazio');
+      const [d22, d24] = await Promise.all([
+        Utils.loadCSV('data/resultados/resultados_ze_2022.csv'),
+        Utils.loadCSV('data/resultados/resultados_ze_2024.csv'),
+      ]);
 
-      Charts.lineSerie(ctx, serie.map(d => String(d.ano)), [
-        { label: '% Campo Progressista', data: serie.map(d => d.campo_pct || 0), color: '#7C3AED' },
-        { label: 'Abstenção %', data: serie.map(d => d.abstencao_pct || 0), color: '#FACC15', borderDash: [4,4] },
+      const zonas22 = d22.map(d => `ZE ${String(d.zona).padStart(4,'0')}`);
+      const zonas24 = d24.map(d => `ZE ${String(d.zona).padStart(4,'0')}`);
+      const allZonas = [...new Set([...zonas22, ...zonas24])].sort();
+
+      const map22 = {}, map24 = {};
+      d22.forEach(d => { map22[`ZE ${String(d.zona).padStart(4,'0')}`] = Number(d.campo_pct) || 0; });
+      d24.forEach(d => { map24[`ZE ${String(d.zona).padStart(4,'0')}`] = Number(d.campo_pct) || 0; });
+
+      Charts.barGrouped(ctx, allZonas, [
+        { label: '% Campo 2022 (Dep.Est.)', data: allZonas.map(z => map22[z] || 0), color: '#7C3AED' },
+        { label: '% Campo 2024 (Vereador)', data: allZonas.map(z => map24[z] || 0), color: '#A78BFA' },
       ], { pct: true });
     } catch {
-      const pontos = [], pontosAbst = [];
-      for (const ano of anos) {
-        try {
-          const dados = await Utils.loadCSV(`data/resultados/resultados_ze_${ano}.csv`);
-          const tVotos = dados.reduce((s,d) => s + (d.votos_total||0), 0);
-          const tCampo = dados.reduce((s,d) => s + (d.votos_campo||0), 0);
-          const tEleit = dados.reduce((s,d) => s + (d.eleitores_aptos||0), 0);
-          const tAbst = dados.reduce((s,d) => s + (d.abstencoes||0), 0);
-          pontos.push(tVotos ? Number((tCampo/tVotos*100).toFixed(1)) : null);
-          pontosAbst.push(tEleit ? Number((tAbst/tEleit*100).toFixed(1)) : null);
-        } catch { pontos.push(null); pontosAbst.push(null); }
-      }
-
-      Charts.lineSerie(ctx, anos.map(String), [
-        { label: '% Campo Progressista', data: pontos, color: '#7C3AED' },
-        { label: 'Abstenção %', data: pontosAbst, color: '#FACC15', borderDash: [4,4] },
-      ], { pct: true });
+      if (ctx.parentElement) ctx.parentElement.innerHTML = `<div class="loading-overlay" style="height:200px">Dados de resultados não encontrados</div>`;
     }
   }
 
-  async function renderVariacao(anoIni, anoFim, map) {
-    const crescEl = document.getElementById('ev-top-crescimento');
-    const quedaEl = document.getElementById('ev-top-queda');
+  async function renderCandidatas() {
+    const CAND_50110 = '50110';
+    const CAND_50019 = '50019';
 
     try {
-      const [ini, fim] = await Promise.all([
-        Utils.loadCSV(`data/resultados/resultados_ze_${anoIni}.csv`),
-        Utils.loadCSV(`data/resultados/resultados_ze_${anoFim}.csv`),
+      const [nom22, nom24] = await Promise.all([
+        Utils.loadCSV('data/resultados/votos_nominais_ze_2022.csv'),
+        Utils.loadCSV('data/resultados/votos_nominais_ze_2024.csv'),
       ]);
 
-      const mapaIni = {}, mapaFim = {};
-      ini.forEach(d => { mapaIni[String(d.zona).padStart(4,'0')] = d; });
-      fim.forEach(d => { mapaFim[String(d.zona).padStart(4,'0')] = d; });
+      // Ediane 2022
+      const ediane = nom22
+        .filter(d => String(d.nr_candidato) === CAND_50110)
+        .sort((a, b) => (Number(a.zona) || 0) - (Number(b.zona) || 0));
 
-      const zonas = [...new Set([...Object.keys(mapaIni), ...Object.keys(mapaFim)])];
-      const variacoes = zonas.map(zona => ({
-        zona,
-        delta: ((mapaFim[zona]?.campo_pct || 0) - (mapaIni[zona]?.campo_pct || 0)),
-        fim: mapaFim[zona]?.campo_pct || 0,
-        ini: mapaIni[zona]?.campo_pct || 0,
-      })).filter(d => mapaIni[d.zona] && mapaFim[d.zona]);
-
-      variacoes.sort((a, b) => b.delta - a.delta);
-
-      const ctx = document.getElementById('chart-ev-variacao');
-      if (ctx) {
-        Charts.barGrouped(ctx,
-          variacoes.map(d => `ZE ${d.zona}`),
-          [{
-            label: `Δ Campo ${anoIni}→${anoFim}`,
-            data: variacoes.map(d => Number(d.delta.toFixed(1))),
-            color: variacoes.map(d => d.delta >= 0 ? '#16a34a' : '#dc2626'),
-          }],
-          { pct: true }
-        );
+      const labelsE = ediane.map(d => `ZE ${String(d.zona).padStart(4,'0')}`);
+      const votosE  = ediane.map(d => Number(d.votos) || 0);
+      const ctxE = document.getElementById('chart-ev-ediane');
+      if (ctxE && ediane.length) {
+        Charts.barGrouped(ctxE, labelsE,
+          [{ label: 'Votos Ediane', data: votosE, color: '#7C3AED' }]);
+      } else if (ctxE) {
+        ctxE.parentElement.innerHTML = `<div class="loading-overlay" style="height:180px">Sem dados de Ediane em 2022</div>`;
       }
 
-      const topCresc = variacoes.slice(0, 3);
-      const topQueda = variacoes.slice(-3).reverse();
+      // Thamy 2024
+      const thamy = nom24
+        .filter(d => String(d.nr_candidato) === CAND_50019)
+        .sort((a, b) => (Number(a.zona) || 0) - (Number(b.zona) || 0));
 
-      crescEl.innerHTML = topCresc.map(d => `
-        <div class="ranking-item">
-          <div class="ranking-info">
-            <div class="ranking-zone">Zona ${d.zona}</div>
-            <div class="ranking-meta">${anoIni}: ${Utils.fmtPct(d.ini)} → ${anoFim}: ${Utils.fmtPct(d.fim)}</div>
-          </div>
-          <span style="font-weight:600;color:#16a34a">+${d.delta.toFixed(1)}pp</span>
-        </div>
-      `).join('');
+      const labelsT = thamy.map(d => `ZE ${String(d.zona).padStart(4,'0')}`);
+      const votosT  = thamy.map(d => Number(d.votos) || 0);
+      const ctxT = document.getElementById('chart-ev-thamy');
+      if (ctxT && thamy.length) {
+        Charts.barGrouped(ctxT, labelsT,
+          [{ label: 'Votos Thamy', data: votosT, color: '#FACC15' }]);
+      } else if (ctxT) {
+        ctxT.parentElement.innerHTML = `<div class="loading-overlay" style="height:180px">Sem dados de Thamy em 2024</div>`;
+      }
 
-      quedaEl.innerHTML = topQueda.map(d => `
-        <div class="ranking-item">
-          <div class="ranking-info">
-            <div class="ranking-zone">Zona ${d.zona}</div>
-            <div class="ranking-meta">${anoIni}: ${Utils.fmtPct(d.ini)} → ${anoFim}: ${Utils.fmtPct(d.fim)}</div>
-          </div>
-          <span style="font-weight:600;color:#dc2626">${d.delta.toFixed(1)}pp</span>
-        </div>
-      `).join('');
+      // Rankings
+      renderRanking('ev-rank-ediane', ediane, votosE, labelsE, 2022, '#7C3AED');
+      renderRanking('ev-rank-thamy', thamy, votosT, labelsT, 2024, '#FACC15');
 
-      // Mapa de variação
-      fetch('data/geo/zonas_campinas.geojson')
-        .then(r => r.ok ? r.json() : null)
-        .then(geojson => {
-          if (!geojson) return;
-          const dadosMap = variacoes.map(v => ({ zona: v.zona, campo_pct: v.delta }));
-          MapModule.renderChoropleth(map, geojson, dadosMap, 'campo_pct', 'variacao', (feature, layer) => {
-            const zona = String(feature.properties.zona || '').padStart(4,'0');
-            const d = variacoes.find(v => v.zona === zona);
-            if (d) layer.bindTooltip(`<strong>Zona ${zona}</strong><br>Δ ${d.delta.toFixed(1)}pp`);
-          });
-          MapModule.renderLegend(map, [
-            { color: '#15803D', label: '> +5pp' },
-            { color: '#4ADE80', label: '+2 a +5pp' },
-            { color: '#94A3B8', label: '-2 a +2pp' },
-            { color: '#F87171', label: '-5 a -2pp' },
-            { color: '#DC2626', label: '< -5pp' },
-          ], 'Variação');
-        })
-        .catch(() => {});
-
-    } catch {
-      crescEl.innerHTML = `<div style="color:var(--texto-secundario);font-size:13px;padding:8px">Dados não disponíveis para ${anoIni}.</div>`;
-      quedaEl.innerHTML = crescEl.innerHTML;
+    } catch (err) {
+      ['ev-rank-ediane', 'ev-rank-thamy'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = `<div style="color:var(--texto-secundario);font-size:13px;padding:8px">Dados não encontrados</div>`;
+      });
     }
+  }
+
+  function renderRanking(elId, dados, votos, labels, ano, color) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (!dados.length) {
+      el.innerHTML = `<div style="color:var(--texto-secundario);font-size:13px;padding:8px">Sem dados em ${ano}</div>`;
+      return;
+    }
+
+    const sorted = dados
+      .map((d, i) => ({ label: labels[i], votos: votos[i] }))
+      .sort((a, b) => b.votos - a.votos)
+      .slice(0, 5);
+
+    const total = votos.reduce((a, b) => a + b, 0);
+
+    el.innerHTML = `
+      <div style="font-size:12px;color:var(--texto-secundario);margin-bottom:8px">Total: ${Utils.fmt(total)} votos em ${dados.length} zonas</div>
+      ${sorted.map(d => `
+        <div class="ranking-item">
+          <div class="ranking-info">
+            <div class="ranking-zone">${d.label}</div>
+          </div>
+          <span style="font-weight:600;color:${color}">${Utils.fmt(d.votos)}</span>
+        </div>
+      `).join('')}
+    `;
   }
 
   return { render };
