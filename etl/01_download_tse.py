@@ -35,12 +35,17 @@ CHUNK = 50_000
 # Mapeamento: nome_saida → lista de candidatos de URL (tenta em ordem)
 # {ano} e {UF} são substituídos em tempo de execução
 FONTES = {
-    # Principal: votos agregados por partido e zona — tem SG_PARTIDO, NM_PARTIDO
+    # Votos agregados por partido e zona
     "votacao_partido_munzona": {
         ano: [f"{BASE}/votacao_partido_munzona/votacao_partido_munzona_{ano}.zip"]
         for ano in ANOS
     },
-    # Geocodificação: endereços dos locais de votação
+    # Votos nominais por candidato e zona — permite filtrar qualquer candidato
+    "votacao_candidato_munzona": {
+        ano: [f"{BASE}/votacao_candidato_munzona/votacao_candidato_munzona_{ano}.zip"]
+        for ano in ANOS
+    },
+    # Nível de seção: endereços dos locais + votos por urna (mapa de calor)
     "votacao_secao": {
         ano: [f"{BASE}/votacao_secao/votacao_secao_{ano}_{UF}.zip"]
         for ano in ANOS
