@@ -43,7 +43,7 @@ Orienta a estratégia de uma candidatura a deputada estadual com base em dados e
 - Resultados por seção eleitoral: eleições 2018, 2020, 2022, 2024
 - Perfil do eleitorado: por zona eleitoral (sexo, faixa etária, escolaridade, estado civil)
 - Formato: CSV compactado por estado/ano
-- Código do município Campinas no TSE: **61965**
+- Código do município Campinas no TSE: **62910**
 
 ### IBGE (Fase 2 apenas)
 - Malhas geográficas e dados do Censo 2022
@@ -64,7 +64,7 @@ Definido em `data/config.json`:
   "campo_progressista": ["PSOL", "PT", "REDE", "PCdoB", "UP", "PSTU"],
   "partido_foco": "PSOL",
   "municipio_foco": "Campinas",
-  "codigo_municipio_tse": "61965",
+  "codigo_municipio_tse": "62910",
   "anos_disponiveis": [2018, 2020, 2022, 2024]
 }
 ```
