@@ -16,5 +16,15 @@
   "classificacao_thresholds": {
     "consolidar": 75,
     "crescer": 55
+  },
+  "candidatos_referencia": {
+    "2018": {},
+    "2020": {},
+    "2022": {"50110": "ediane"},
+    "2024": {"50019": "thamy"}
+  },
+  "candidatos_nomes": {
+    "ediane": "Ediane Maria",
+    "thamy": "Thamy do Mandela"
   }
 }

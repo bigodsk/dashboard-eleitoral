@@ -1,34 +1,32 @@
 """
 Geocodifica os locais de votação de Campinas usando Nominatim (OpenStreetMap).
-Extrai endereços diretamente dos arquivos votacao_secao (já baixados).
+Lê endereços direto de data/raw/campinas/votacao_secao_{ano}.csv.
 
 Saída:
-  data/geo/locais_votacao.csv
-  data/geo/secoes_geo.geojson
+  data/geo/locais_votacao.csv       — tabela de locais com lat/lng
+  data/geo/secoes_geo.geojson       — GeoJSON: um ponto por seção eleitoral
 """
 
 import json
 import time
 import pandas as pd
-import geopandas as gpd
 from pathlib import Path
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError
-from shapely.geometry import Point
 from tqdm import tqdm
 
-ROOT = Path(__file__).parent.parent
-CONFIG = json.loads((ROOT / "data" / "config.json").read_text())
-
-RAW_VOTACAO = ROOT / "data" / "raw" / "votacao_secao"
-GEO_DIR = ROOT / "data" / "geo"
+ROOT     = Path(__file__).parent.parent
+RAW_DIR  = ROOT / "data" / "raw" / "campinas"
+GEO_DIR  = ROOT / "data" / "geo"
 GEO_DIR.mkdir(parents=True, exist_ok=True)
 
 CACHE_FILE = Path(__file__).parent / ".cache" / "geocode_cache.json"
 CACHE_FILE.parent.mkdir(exist_ok=True)
 
-MUNICIPIO_COD = CONFIG["codigo_municipio_tse"]
-DELAY = 1.1  # Nominatim: máx 1 req/s
+# Coordenada fallback = centro de Campinas
+FALLBACK_LAT = -22.9064
+FALLBACK_LNG = -47.0616
+DELAY = 1.2  # Nominatim: máx 1 req/s
 
 
 def carregar_cache() -> dict:
@@ -41,184 +39,185 @@ def salvar_cache(cache: dict) -> None:
     CACHE_FILE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def geocodificar(geocoder: Nominatim, endereco: str, cache: dict) -> tuple:
-    if endereco in cache:
-        return cache[endereco]["lat"], cache[endereco]["lng"]
+def geocodificar_um(geocoder: Nominatim, query: str, cache: dict) -> tuple[float, float, bool]:
+    """Retorna (lat, lng, geocodificado_individualmente)."""
+    if query in cache:
+        cached = cache[query]
+        if cached["lat"] is not None:
+            return cached["lat"], cached["lng"], True
+        return FALLBACK_LAT, FALLBACK_LNG, False
 
+    time.sleep(DELAY)
     try:
-        time.sleep(DELAY)
-        res = geocoder.geocode(endereco, timeout=15)
+        res = geocoder.geocode(query, timeout=20, country_codes="br")
         if res:
-            cache[endereco] = {"lat": res.latitude, "lng": res.longitude}
-            return res.latitude, res.longitude
+            # Aceita só se não for resultado muito genérico (nível cidade/estado)
+            addr = (res.raw.get("display_name") or "").lower()
+            if res.latitude and not (abs(res.latitude - FALLBACK_LAT) < 0.001
+                                     and abs(res.longitude - FALLBACK_LNG) < 0.001):
+                cache[query] = {"lat": res.latitude, "lng": res.longitude, "display": addr[:120]}
+                return res.latitude, res.longitude, True
     except (GeocoderTimedOut, GeocoderServiceError) as e:
-        print(f"  Timeout/erro: {e}")
+        print(f"    Erro: {e}")
 
-    cache[endereco] = {"lat": None, "lng": None}
-    return None, None
-
-
-def ler_csv_tse(path: Path) -> pd.DataFrame:
-    for enc in ["latin-1", "iso-8859-1", "utf-8"]:
-        try:
-            return pd.read_csv(path, sep=";", encoding=enc, dtype=str, low_memory=False)
-        except Exception:
-            continue
-    return pd.DataFrame()
+    cache[query] = {"lat": None, "lng": None}
+    return FALLBACK_LAT, FALLBACK_LNG, False
 
 
-def filtrar_campinas(df: pd.DataFrame) -> pd.DataFrame:
-    col = next((c for c in df.columns if "CD_MUNICIPIO" in c or "NR_MUNICIPIO" in c), None)
-    if col:
-        return df[df[col].str.strip() == MUNICIPIO_COD].copy()
-    nm = next((c for c in df.columns if "NM_MUNICIPIO" in c), None)
-    if nm:
-        return df[df[nm].str.upper().str.contains("CAMPINAS", na=False)].copy()
-    return df
-
-
-def extrair_locais_de_votacao_secao() -> pd.DataFrame:
+def montar_queries(nm_local: str, endereco: str) -> list[str]:
     """
-    Extrai endereços dos locais de votação a partir dos arquivos votacao_secao.
-    Esses arquivos contêm DS_LOCAL_VOTACAO, NR_LOCAL_VOTACAO e endereço nas colunas.
-    Usa o ano mais recente disponível.
+    Retorna lista de queries do mais específico para o menos específico.
+    Nominatim: tentar primeiro o endereço completo, depois só o logradouro.
     """
-    for ano in [2024, 2022, 2020, 2018]:
-        pasta = RAW_VOTACAO / str(ano)
-        if not pasta.exists():
+    queries = []
+    end = endereco.strip().rstrip(",")
+
+    # Substitui "S/N" por vazio (sem número é mais fácil de geocodar)
+    end_sem_sn = end.replace(", S/N", "").replace(",S/N", "").replace(" S/N", "").strip()
+
+    if end_sem_sn:
+        queries.append(f"{end_sem_sn}, Campinas, SP")
+    if end and end != end_sem_sn:
+        queries.append(f"{end}, Campinas, SP")
+    if nm_local:
+        queries.append(f"{nm_local.strip()}, Campinas, SP")
+
+    return queries
+
+
+def extrair_locais(ano_preferido=2022) -> pd.DataFrame:
+    """Extrai tabela de locais únicos com endereços."""
+    for ano in [ano_preferido, 2024, 2022, 2020, 2018]:
+        path = RAW_DIR / f"votacao_secao_{ano}.csv"
+        if not path.exists():
             continue
 
-        csvs = list(pasta.glob("*.csv")) or list(pasta.glob("**/*.csv"))
-        frames = []
-        for csv in csvs:
-            df = ler_csv_tse(csv)
-            if df.empty:
-                continue
-            df = filtrar_campinas(df)
-            if not df.empty:
-                frames.append(df)
+        df = pd.read_csv(path, dtype=str, low_memory=False,
+                         usecols=lambda c: c in [
+                             "NR_ZONA", "NR_SECAO", "NR_LOCAL_VOTACAO",
+                             "NM_LOCAL_VOTACAO", "DS_LOCAL_VOTACAO_ENDERECO",
+                             "NM_UE",
+                         ])
 
-        if not frames:
-            continue
-
-        df = pd.concat(frames, ignore_index=True)
-
-        # Colunas de localização que o TSE inclui nos arquivos de votação
-        colunas_local = [c for c in [
-            "NR_ZONA", "NR_SECAO", "NR_LOCAL_VOTACAO",
-            "DS_LOCAL_VOTACAO",       # nome do local (escola, ginásio, etc.)
-            "DS_ENDERECO",            # endereço completo (alguns anos)
-            "NM_LOGRADOURO",          # logradouro (alguns anos)
-            "NR_LOGRADOURO",          # número
-            "NM_BAIRRO",              # bairro
-            "DS_MUNICIPIO", "NM_UE",  # município
-            "NR_CEP",                 # CEP
-        ] if c in df.columns]
-
-        if "NR_ZONA" not in colunas_local or "NR_SECAO" not in colunas_local:
-            continue
-
-        df_locais = df[colunas_local].drop_duplicates(
-            subset=["NR_ZONA", "NR_SECAO"]
-        ).reset_index(drop=True)
-
-        print(f"  Locais extraídos de votacao_secao/{ano}: {len(df_locais)} seções únicas")
-        return df_locais
+        locais = (
+            df[["NR_ZONA", "NR_SECAO", "NR_LOCAL_VOTACAO",
+                "NM_LOCAL_VOTACAO", "DS_LOCAL_VOTACAO_ENDERECO",
+                "NM_UE"]]
+            .drop_duplicates(subset=["NR_LOCAL_VOTACAO"])
+            .reset_index(drop=True)
+        )
+        print(f"  Locais únicos em votacao_secao_{ano}: {len(locais)}")
+        return locais
 
     return pd.DataFrame()
-
-
-def montar_endereco(row: pd.Series) -> str:
-    partes = []
-
-    # Nome do local (escola, ginásio...)
-    for col in ["DS_LOCAL_VOTACAO"]:
-        if col in row.index and pd.notna(row[col]) and str(row[col]).strip():
-            partes.append(str(row[col]).strip().title())
-            break
-
-    # Logradouro + número
-    logradouro = ""
-    for col in ["DS_ENDERECO", "NM_LOGRADOURO"]:
-        if col in row.index and pd.notna(row[col]) and str(row[col]).strip():
-            logradouro = str(row[col]).strip()
-            break
-
-    numero = ""
-    if "NR_LOGRADOURO" in row.index and pd.notna(row["NR_LOGRADOURO"]):
-        nr = str(row["NR_LOGRADOURO"]).strip()
-        if nr not in ("", "S/N", "SN", "0"):
-            numero = nr
-
-    if logradouro:
-        partes.append(f"{logradouro}, {numero}".strip(", "))
-
-    # CEP se disponível
-    if "NR_CEP" in row.index and pd.notna(row["NR_CEP"]):
-        cep = str(row["NR_CEP"]).strip()
-        if len(cep) >= 8:
-            partes.append(cep)
-
-    partes.append("Campinas, SP, Brasil")
-    return ", ".join(p for p in partes if p)
 
 
 def main():
-    print("=== Geocodificando locais de votação ===\n")
-    print("Fonte: colunas de endereço dos arquivos votacao_secao\n")
+    print("=== Geocodificando locais de votação de Campinas ===\n")
 
-    df = extrair_locais_de_votacao_secao()
-    if df.empty:
-        print("ERRO: Nenhum dado de localização encontrado.")
-        print("Verifique se votacao_secao foi baixado corretamente.")
+    locais = extrair_locais()
+    if locais.empty:
+        print("ERRO: Nenhum arquivo votacao_secao encontrado em data/raw/campinas/")
         return
 
     cache = carregar_cache()
-    geocoder = Nominatim(user_agent="dashboard-eleitoral-campinas-sp-v2")
+    # Limpa cache de resultados inválidos (coordenada genérica da cidade)
+    invalidos = [k for k, v in cache.items()
+                 if v.get("lat") and abs(v["lat"] - (-22.9056391)) < 0.0001]
+    for k in invalidos:
+        del cache[k]
+    if invalidos:
+        print(f"  Cache: {len(invalidos)} entradas genéricas removidas\n")
 
-    print(f"\nGecodificando {len(df)} seções...")
+    geocoder = Nominatim(user_agent="dashboard-eleitoral-campinas-psol-v3")
 
-    lats, lngs, enderecos_usados = [], [], []
+    lats, lngs, geocodes_ok = [], [], []
 
-    for _, row in tqdm(df.iterrows(), total=len(df), desc="Nominatim"):
-        endereco = montar_endereco(row)
-        enderecos_usados.append(endereco)
-        lat, lng = geocodificar(geocoder, endereco, cache)
+    print(f"Geocodificando {len(locais)} locais via Nominatim...")
+    for _, row in tqdm(locais.iterrows(), total=len(locais)):
+        nm   = str(row.get("NM_LOCAL_VOTACAO", "") or "").strip()
+        end  = str(row.get("DS_LOCAL_VOTACAO_ENDERECO", "") or "").strip()
+
+        queries = montar_queries(nm, end)
+
+        lat, lng, ok = FALLBACK_LAT, FALLBACK_LNG, False
+        for q in queries:
+            lat, lng, ok = geocodificar_um(geocoder, q, cache)
+            if ok:
+                break
+
         lats.append(lat)
         lngs.append(lng)
+        geocodes_ok.append(ok)
 
-        # Salva cache a cada 50 requisições para não perder progresso
-        if len(lats) % 50 == 0:
+        if len(lats) % 20 == 0:
             salvar_cache(cache)
 
     salvar_cache(cache)
 
-    df = df.copy()
-    df["endereco_geocode"] = enderecos_usados
-    df["lat"] = lats
-    df["lng"] = lngs
+    locais = locais.copy()
+    locais["lat"] = lats
+    locais["lng"] = lngs
+    locais["geocode_ok"] = geocodes_ok
 
+    n_ok = sum(geocodes_ok)
+    print(f"\nGeocods com sucesso: {n_ok}/{len(locais)} ({n_ok/len(locais)*100:.0f}%)")
+
+    # Salva CSV de locais
     out_csv = GEO_DIR / "locais_votacao.csv"
-    df.to_csv(out_csv, index=False, encoding="utf-8")
-    print(f"\nLocais salvos: {out_csv.name}")
+    locais.to_csv(out_csv, index=False, encoding="utf-8")
+    print(f"CSV: {out_csv.name}")
 
-    df_geo = df[df["lat"].notna() & df["lng"].notna()].copy()
-    if df_geo.empty:
-        print("Nenhuma coordenada obtida. Verifique o log acima.")
+    # ── GeoJSON de seções: repete coordenada do local para cada seção ──
+    # Recarrega todas as seções de todos os anos para o GeoJSON final
+    secoes_frames = []
+    for ano in [2018, 2020, 2022, 2024]:
+        p = RAW_DIR / f"votacao_secao_{ano}.csv"
+        if not p.exists():
+            continue
+        df = pd.read_csv(p, dtype=str, low_memory=False,
+                         usecols=lambda c: c in ["NR_ZONA", "NR_SECAO", "NR_LOCAL_VOTACAO", "NM_UE"])
+        secoes_frames.append(df.drop_duplicates(subset=["NR_ZONA", "NR_SECAO"]))
+
+    if not secoes_frames:
+        print("Sem dados de seções para o GeoJSON.")
         return
 
-    gdf = gpd.GeoDataFrame(
-        df_geo,
-        geometry=[Point(r["lng"], r["lat"]) for _, r in df_geo.iterrows()],
-        crs="EPSG:4326",
+    todas_secoes = pd.concat(secoes_frames, ignore_index=True).drop_duplicates(
+        subset=["NR_ZONA", "NR_SECAO"]
     )
 
-    out_geojson = GEO_DIR / "secoes_geo.geojson"
-    gdf.to_file(out_geojson, driver="GeoJSON")
-    print(f"GeoJSON salvo: {out_geojson.name} ({len(gdf)} pontos)")
+    # Junta coordenadas via NR_LOCAL_VOTACAO
+    coord_map = locais.set_index("NR_LOCAL_VOTACAO")[["lat", "lng", "geocode_ok"]].to_dict("index")
 
-    n = df["lat"].notna().sum()
-    print(f"\nTaxa de geocodificação: {n}/{len(df)} ({n/len(df)*100:.1f}%)")
+    features = []
+    for _, row in todas_secoes.iterrows():
+        nr_local = str(row.get("NR_LOCAL_VOTACAO", ""))
+        coords = coord_map.get(nr_local, {})
+        lat = coords.get("lat", FALLBACK_LAT)
+        lng = coords.get("lng", FALLBACK_LNG)
+
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [lng, lat]},
+            "properties": {
+                "NR_ZONA":          str(row.get("NR_ZONA", "")).zfill(4),
+                "NR_SECAO":         str(row.get("NR_SECAO", "")).zfill(4),
+                "NR_LOCAL_VOTACAO": nr_local,
+                "NM_UE":            str(row.get("NM_UE", "")),
+                "geocode_ok":       coords.get("geocode_ok", False),
+                "lat":              lat,
+                "lng":              lng,
+            },
+        })
+
+    geojson = {"type": "FeatureCollection", "features": features}
+    out_gj = GEO_DIR / "secoes_geo.geojson"
+    with open(out_gj, "w", encoding="utf-8") as f:
+        json.dump(geojson, f, ensure_ascii=False, separators=(",", ":"))
+
+    n_indiv = sum(1 for feat in features if feat["properties"]["geocode_ok"])
+    print(f"GeoJSON: {out_gj.name} ({len(features)} seções, {n_indiv} com coord individual)")
 
 
 if __name__ == "__main__":

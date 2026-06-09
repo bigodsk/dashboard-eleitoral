@@ -26,13 +26,15 @@ OUT_DIR  = ROOT / "data" / "resultados"
 GEO_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-ANOS          = CONFIG["anos_disponiveis"]
+ANOS           = CONFIG["anos_disponiveis"]
 ANOS_MUNICIPAL = set(CONFIG.get("anos_municipal", [2020, 2024]))
-CAMPO         = [p.upper() for p in CONFIG["campo_progressista"]]
-MUNICIPIO_COD = CONFIG["codigo_municipio_tse"]
-
-# Candidatos de referência: número → chave no GeoJSON
-CANDS_REF = {"50888": "votos_ediane", "50019": "votos_thamy"}
+CAMPO          = [p.upper() for p in CONFIG["campo_progressista"]]
+MUNICIPIO_COD  = CONFIG["codigo_municipio_tse"]
+# Candidatos de referência por ano: {"ano_str": {"nr_candidato": "chave_geojson"}}
+CANDS_REF_POR_ANO = {
+    int(k): {nr: f"votos_{apelido}" for nr, apelido in v.items()}
+    for k, v in CONFIG.get("candidatos_referencia", {}).items()
+}
 
 MIN_VOTOS = 30   # mínimo de votos num local para incluir no CSV dinâmico
 
@@ -132,9 +134,10 @@ def processar_ano(ano: int, coords: pd.DataFrame) -> None:
         .rename(columns={"NR_LOCAL_VOTACAO": "nr_local"})
     )
 
-    # Votos dos candidatos de referência por local
+    # Votos dos candidatos de referência por local (configurados por ano)
+    cands_ref_ano = CANDS_REF_POR_ANO.get(ano, {})
     ref_dfs = {}
-    for nr, col in CANDS_REF.items():
+    for nr, col in cands_ref_ano.items():
         sub = df[df["NR_VOTAVEL"] == nr].groupby("NR_LOCAL_VOTACAO")["QT_VOTOS"].sum()
         if sub.sum() > 0:
             ref_dfs[col] = sub.rename(col).reset_index().rename(
@@ -209,13 +212,15 @@ def processar_ano(ano: int, coords: pd.DataFrame) -> None:
     print(f"  CSV dinâmico: {out_csv.name} ({len(cand_local)} linhas, {n_cands} candidatos)")
 
     # Referências
-    refs = {"50888": "Ediane Maria", "50019": "Thamy do Mandela"}
-    for nr, nome in refs.items():
+    nomes_ref = CONFIG.get("candidatos_nomes", {})
+    for nr, col in cands_ref_ano.items():
+        apelido = col.replace("votos_", "")
+        nome = nomes_ref.get(apelido, nr)
         sub = cand_local[cand_local["nr_candidato"] == nr]
         if not sub.empty:
-            print(f"  → {nome}: {sub['votos'].sum():,} votos em {len(sub)} locais com geocoord")
+            print(f"  >> {nome} ({nr}): {sub['votos'].sum():,} votos em {len(sub)} locais")
         else:
-            print(f"  → {nome}: sem dados em {ano}")
+            print(f"  >> {nome} ({nr}): sem dados em {ano}")
 
 
 def main():
