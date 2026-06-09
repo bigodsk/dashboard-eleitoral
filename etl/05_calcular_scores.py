@@ -111,20 +111,27 @@ def main():
         df_perfil["zona"] = df_perfil["zona"].astype(str).str.zfill(4)
         df_perfil = df_perfil.set_index("zona")
 
+        # Eleitores do perfil (se não vieram dos resultados)
+        if "eleitores_aptos" not in df_atual.columns or df_atual["eleitores_aptos"].isna().all():
+            if "total_eleitores" in df_perfil.columns:
+                df_atual["eleitores_aptos"] = df_perfil["total_eleitores"].reindex(df_atual.index)
+
         col_jovens = next((c for c in df_perfil.columns if "jovens" in c or "16_34" in c), None)
         if col_jovens:
-            df_atual["pct_jovens"] = df_perfil[col_jovens].reindex(df_atual.index).fillna(df_perfil[col_jovens].mean())
+            media_jovens = df_perfil[col_jovens].mean()
+            df_atual["pct_jovens"] = df_perfil[col_jovens].reindex(df_atual.index).fillna(media_jovens)
         else:
             df_atual["pct_jovens"] = 20.0
     else:
         print("Perfil não encontrado, usando valor padrão para jovens.")
         df_atual["pct_jovens"] = 20.0
 
-    # Componentes normalizados
-    df_atual["n_eleitores"] = normalizar_0_100(df_atual["eleitores_aptos"].fillna(0))
-    df_atual["n_crescimento"] = normalizar_0_100(df_atual["crescimento"])
-    df_atual["n_abstencao"] = normalizar_0_100(df_atual["abstencao_pct"].fillna(df_atual["abstencao_pct"].mean()))
-    df_atual["n_jovens"] = normalizar_0_100(df_atual["pct_jovens"])
+    # Componentes normalizados — NaN vira 50 (neutro) para não contaminar o score
+    df_atual["n_eleitores"] = normalizar_0_100(pd.to_numeric(df_atual.get("eleitores_aptos", 0), errors="coerce").fillna(0))
+    df_atual["n_crescimento"] = normalizar_0_100(df_atual["crescimento"].fillna(0))
+    abst = pd.to_numeric(df_atual.get("abstencao_pct"), errors="coerce") if "abstencao_pct" in df_atual.columns else pd.Series(dtype=float)
+    df_atual["n_abstencao"] = normalizar_0_100(abst.fillna(abst.mean())) if not abst.isna().all() else pd.Series(50.0, index=df_atual.index)
+    df_atual["n_jovens"] = normalizar_0_100(df_atual["pct_jovens"].fillna(20.0))
 
     # Score final
     df_atual["score"] = (
