@@ -82,53 +82,57 @@ const ModuloVisaoGeral = (() => {
     const metricsEl = document.getElementById('vg-metrics');
     const rankingEl = document.getElementById('vg-ranking');
 
+    let dados;
     try {
-      const dados = await Utils.loadCSV(`data/resultados/resultados_ze_${ano}.csv`);
-
-      if (!dados || dados.length === 0) {
-        metricsEl.innerHTML = `<div class="metric-card"><div class="metric-label">Dados não disponíveis</div><div class="metric-value" style="font-size:14px">Execute o ETL para carregar os dados de ${ano}</div></div>`;
-        return;
-      }
-
-      const totalEleitores = dados.reduce((s, d) => s + (d.eleitores_aptos || 0), 0);
-      const totalVotosCampo = dados.reduce((s, d) => s + (d.votos_campo || 0), 0);
-      const totalVotos = dados.reduce((s, d) => s + (d.votos_total || 0), 0);
-      const campoPct = totalVotos > 0 ? (totalVotosCampo / totalVotos * 100) : 0;
-      const abstencaoMedia = dados.reduce((s, d) => s + (d.abstencao_pct || 0), 0) / dados.length;
-
-      let scores = null;
-      try { scores = await Utils.loadCSV('data/resultados/scores_ze.csv'); } catch {}
-      const zonasPrioritarias = scores ? scores.filter(s => s.classificacao === 'Crescer' || s.classificacao === 'Consolidar').length : '—';
-
-      metricsEl.innerHTML = `
-        <div class="metric-card">
-          <div class="metric-label">Total de Eleitores</div>
-          <div class="metric-value">${Utils.fmt(totalEleitores)}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Campo Progressista</div>
-          <div class="metric-value">${Utils.fmtPct(campoPct)}</div>
-          <div class="metric-label" style="margin-top:4px">dos votos nominais</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Abstenção Média</div>
-          <div class="metric-value">${Utils.fmtPct(abstencaoMedia)}</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Zonas Prioritárias</div>
-          <div class="metric-value">${typeof zonasPrioritarias === 'number' ? Utils.fmt(zonasPrioritarias) : zonasPrioritarias}</div>
-          <div class="metric-label" style="margin-top:4px">Consolidar + Crescer</div>
-        </div>
-      `;
-
-      renderRanking(rankingEl, dados, scores);
-      renderBarras(dados);
-      renderMapa(dados, config);
-
+      dados = await Utils.loadCSV(`data/resultados/resultados_ze_${ano}.csv`);
     } catch (err) {
-      metricsEl.innerHTML = `<div class="metric-card"><div class="metric-label" style="color:#dc2626">Dados não encontrados para ${ano}</div><div class="metric-value" style="font-size:13px;color:#6B7280">Execute o pipeline ETL primeiro.</div></div>`;
+      metricsEl.innerHTML = `<div class="metric-card"><div class="metric-label" style="color:#dc2626">Arquivo não encontrado para ${ano}</div><div class="metric-value" style="font-size:13px;color:#6B7280">${err.message}</div></div>`;
       rankingEl.innerHTML = '';
+      return;
     }
+
+    if (!dados || dados.length === 0) {
+      metricsEl.innerHTML = `<div class="metric-card"><div class="metric-label">Dados não disponíveis</div><div class="metric-value" style="font-size:14px">Execute o ETL para carregar os dados de ${ano}</div></div>`;
+      return;
+    }
+
+    const totalEleitores = dados.reduce((s, d) => s + (d.eleitores_aptos || 0), 0);
+    const totalVotosCampo = dados.reduce((s, d) => s + (d.votos_campo || 0), 0);
+    const totalVotos = dados.reduce((s, d) => s + (d.votos_total || 0), 0);
+    const campoPct = totalVotos > 0 ? (totalVotosCampo / totalVotos * 100) : 0;
+    const abstPcts = dados.map(d => d.abstencao_pct).filter(v => v !== '' && v != null && !isNaN(v));
+    const abstencaoMedia = abstPcts.length > 0 ? abstPcts.reduce((s, v) => s + Number(v), 0) / abstPcts.length : null;
+
+    let scores = null;
+    try { scores = await Utils.loadCSV('data/resultados/scores_ze.csv'); } catch (_) {}
+    const zonasPrioritarias = scores
+      ? scores.filter(s => s.classificacao === 'Crescer' || s.classificacao === 'Consolidar').length
+      : '—';
+
+    metricsEl.innerHTML = `
+      <div class="metric-card">
+        <div class="metric-label">Total de Eleitores</div>
+        <div class="metric-value">${Utils.fmt(totalEleitores)}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Campo Progressista</div>
+        <div class="metric-value">${Utils.fmtPct(campoPct)}</div>
+        <div class="metric-label" style="margin-top:4px">dos votos nominais</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Abstenção Média</div>
+        <div class="metric-value">${abstencaoMedia != null ? Utils.fmtPct(abstencaoMedia) : 'sem dado'}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Zonas Prioritárias</div>
+        <div class="metric-value">${typeof zonasPrioritarias === 'number' ? Utils.fmt(zonasPrioritarias) : zonasPrioritarias}</div>
+        <div class="metric-label" style="margin-top:4px">Consolidar + Crescer</div>
+      </div>
+    `;
+
+    try { renderRanking(rankingEl, dados, scores); } catch (_) {}
+    try { renderBarras(dados); } catch (_) {}
+    try { renderMapa(dados, config); } catch (_) {}
   }
 
   function renderRanking(el, dados, scores) {

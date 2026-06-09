@@ -5,6 +5,7 @@ const Utils = (() => {
   async function loadConfig() {
     if (_config) return _config;
     const r = await fetch(CONFIG_URL);
+    if (!r.ok) throw new Error(`Configuração não encontrada (${r.status}): ${CONFIG_URL}`);
     _config = await r.json();
     return _config;
   }

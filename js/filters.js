@@ -39,6 +39,7 @@ const Filters = (() => {
       if (ano === defaultAno) opt.selected = true;
       el.appendChild(opt);
     });
+    state.ano = defaultAno;
     el.addEventListener('change', () => set('ano', parseInt(el.value)));
   }
 
