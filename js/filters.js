@@ -28,6 +28,8 @@ const Filters = (() => {
     return key ? state[key] : { ...state };
   }
 
+  const TIPO_ELEICAO = { 2018: 'Dep. Est.', 2020: 'Vereador', 2022: 'Dep. Est.', 2024: 'Vereador' };
+
   function buildAnoSelect(containerId, anos, defaultAno) {
     const el = document.getElementById(containerId);
     if (!el) return;
@@ -35,12 +37,17 @@ const Filters = (() => {
     anos.forEach(ano => {
       const opt = document.createElement('option');
       opt.value = ano;
-      opt.textContent = ano;
+      const tipo = TIPO_ELEICAO[ano] || '';
+      opt.textContent = tipo ? `${ano} — ${tipo}` : String(ano);
       if (ano === defaultAno) opt.selected = true;
       el.appendChild(opt);
     });
     state.ano = defaultAno;
     el.addEventListener('change', () => set('ano', parseInt(el.value)));
+  }
+
+  function tipoEleicao(ano) {
+    return TIPO_ELEICAO[+ano] || '';
   }
 
   function buildPartidoChips(containerId, partidos, campo) {
@@ -63,5 +70,5 @@ const Filters = (() => {
     });
   }
 
-  return { on, set, get, buildAnoSelect, buildPartidoChips };
+  return { on, set, get, buildAnoSelect, buildPartidoChips, tipoEleicao };
 })();

@@ -22,13 +22,16 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 MUNICIPIO_COD = CONFIG["codigo_municipio_tse"]
 CAMPO = [p.upper() for p in CONFIG["campo_progressista"]]
 ANOS = CONFIG["anos_disponiveis"]
+ANOS_MUNICIPAL = set(CONFIG.get("anos_municipal", [2020, 2024]))
 
-# Campo: voto nominal válido para deputado estadual
+# Mapeamento: eleições municipais → VEREADOR; estaduais → DEPUTADO ESTADUAL
+def cargo_do_ano(ano: int) -> str:
+    return "VEREADOR" if ano in ANOS_MUNICIPAL else "DEPUTADO ESTADUAL"
+
 COL_VOTOS_NOM = "QT_VOTOS_NOMINAIS_VALIDOS"
 COL_PARTIDO = "SG_PARTIDO"
 COL_ZONA = "NR_ZONA"
 COL_CARGO = "DS_CARGO"
-CARGO_ALVO = "DEPUTADO ESTADUAL"
 
 
 def carregar_partido_munzona(ano: int) -> pd.DataFrame | None:
@@ -52,16 +55,17 @@ def carregar_partido_munzona(ano: int) -> pd.DataFrame | None:
         print(f"  [{ano}] Nenhum dado de Campinas no arquivo. Verifique o código {MUNICIPIO_COD}.")
         return None
 
-    # Filtrar Deputado Estadual (turno 1)
+    # Filtrar cargo correto para o ano (turno 1)
+    cargo_alvo = cargo_do_ano(ano)
     if COL_CARGO in df.columns:
-        df = df[df[COL_CARGO].str.upper().str.contains(CARGO_ALVO, na=False)].copy()
+        df = df[df[COL_CARGO].str.upper().str.contains(cargo_alvo, na=False)].copy()
 
     col_turno = next((c for c in df.columns if "NR_TURNO" in c), None)
     if col_turno:
         df = df[df[col_turno].astype(str) == "1"].copy()
 
     if df.empty:
-        print(f"  [{ano}] Nenhuma linha para Deputado Estadual.")
+        print(f"  [{ano}] Nenhuma linha para {cargo_alvo}.")
         return None
 
     # Converter votos para numérico

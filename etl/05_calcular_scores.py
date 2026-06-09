@@ -29,7 +29,8 @@ GEO_DIR.mkdir(parents=True, exist_ok=True)
 
 PESOS = CONFIG["score_pesos"]
 THRESH = CONFIG["classificacao_thresholds"]
-ANOS = CONFIG["anos_disponiveis"]
+# Score usa só eleições estaduais (dep. estadual); municipais servem para análise separada
+ANOS = CONFIG.get("anos_estadual", CONFIG["anos_disponiveis"])
 
 
 def normalizar_0_100(series: pd.Series) -> pd.Series:

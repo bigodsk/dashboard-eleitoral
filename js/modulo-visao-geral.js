@@ -85,6 +85,7 @@ const ModuloVisaoGeral = (() => {
     const partidosSel = Filters.get('partidos');
     const isCampoTotal = !partidosSel || partidosSel.length === 0;
     const partidoFoco = isCampoTotal ? null : partidosSel[0];
+    const tipoEleicao = Filters.tipoEleicao(ano);
 
     // Base: resultados agregados por zona (eleitores, votos_total, campo_pct)
     let dadosBase;
@@ -149,7 +150,7 @@ const ModuloVisaoGeral = (() => {
       <div class="metric-card">
         <div class="metric-label">${labelFoco}</div>
         <div class="metric-value">${Utils.fmtPct(focoPct)}</div>
-        <div class="metric-label" style="margin-top:4px">dos votos nominais</div>
+        <div class="metric-label" style="margin-top:4px">${tipoEleicao ? `votos — ${tipoEleicao}` : 'dos votos nominais'}</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Abstenção Média</div>
