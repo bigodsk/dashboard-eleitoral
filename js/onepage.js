@@ -164,7 +164,7 @@ const OnePage = (() => {
             <tr>
               <th>Zona</th>
               <th>Classificação</th>
-              <th style="text-align:right" title="Pontuação de prioridade (0–100): potencial de crescimento, base jovem e % do campo">Score ⓘ</th>
+              <th style="text-align:right;cursor:help" title="Pontuação de prioridade (0–100): potencial de crescimento, base jovem e % do campo">Score</th>
               <th style="text-align:right">Campo %</th>
             </tr>
           </thead>
