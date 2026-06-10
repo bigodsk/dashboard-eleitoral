@@ -72,15 +72,15 @@ const OnePage = (() => {
             <div class="map-ctrl-divider"></div>
             <div class="map-ctrl-group">
               <span class="map-ctrl-lbl">Limites</span>
-              <button class="map-ctrl-btn map-ctrl-on" id="ctrl-zonas" title="Zonas Eleitorais">Zonas</button>
-              <button class="map-ctrl-btn" id="ctrl-regioes" title="Administrações Regionais (19 ARs)">Regiões</button>
-              <button class="map-ctrl-btn" id="ctrl-apg" title="Áreas de Planejamento e Gestão (17 APGs) — com população">APGs</button>
-              <button class="map-ctrl-btn" id="ctrl-utb" title="Unidades Territoriais Básicas (93 UTBs) — com população">UTBs</button>
+              <button class="map-ctrl-btn map-ctrl-on" id="ctrl-zonas" title="Zonas Eleitorais — 7 ZEs de Campinas. Polígonos aproximados por hull convexo dos locais de votação. Fonte: TSE">Zonas</button>
+              <button class="map-ctrl-btn" id="ctrl-regioes" title="Administrações Regionais — 19 ARs oficiais de Campinas (AR-01 a AR-15 + distritos). Fonte: Prefeitura de Campinas / SEPLAMA">Regiões</button>
+              <button class="map-ctrl-btn" id="ctrl-apg" title="Áreas de Planejamento e Gestão — 17 APGs com histórico de população (1970–2022). Coloridas por população no Censo 2022. Fonte: Prefeitura de Campinas / Plano Diretor 2018">APGs</button>
+              <button class="map-ctrl-btn" id="ctrl-utb" title="Unidades Territoriais Básicas — 93 UTBs urbanas com histórico de população (1970–2022). Coloridas por população no Censo 2022. Fonte: Prefeitura de Campinas / Plano Diretor 2018">UTBs</button>
             </div>
             <div class="map-ctrl-divider"></div>
             <div class="map-ctrl-group">
               <span class="map-ctrl-lbl">Social</span>
-              <button class="map-ctrl-btn" id="ctrl-sehab" title="Núcleos Urbanos de Interesse Social (SEHAB)">Núcleos</button>
+              <button class="map-ctrl-btn" id="ctrl-sehab" title="Núcleos Urbanos de Interesse Social — 556 núcleos habitacionais de baixa renda mapeados pela SEHAB. Indica territórios de vulnerabilidade social. Fonte: Prefeitura de Campinas / SEHAB">Núcleos</button>
             </div>
           </div>
           <div class="map-container-report" id="op-map-container">
