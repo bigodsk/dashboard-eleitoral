@@ -732,6 +732,58 @@ input[type="range"]::-webkit-slider-thumb {
   min-width: 320px;
 }
 
+.op-priority-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--fundo);
+  z-index: 2;
+}
+
+/* ── Ícone de info nas colunas ── */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--psol-roxo-claro);
+  color: var(--psol-roxo);
+  font-size: 8px;
+  font-weight: 700;
+  font-style: italic;
+  cursor: help;
+  margin-left: 4px;
+  flex-shrink: 0;
+  vertical-align: middle;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+
+.info-icon:hover {
+  background: var(--psol-roxo);
+  color: #fff;
+}
+
+/* ── Tooltip flutuante (appended ao body, não clipado) ── */
+.op-tooltip-float {
+  position: absolute;
+  z-index: 9999;
+  background: #1C1B2E;
+  color: #E9E4FF;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+  padding: 9px 13px;
+  border-radius: 6px;
+  max-width: 260px;
+  display: none;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .map-container-report {
   height: 340px;
   background: #1a1a2e;

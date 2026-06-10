@@ -137,10 +137,61 @@ const OnePage = (() => {
     }
   }
 
+  // ── Tooltip flutuante (appended ao body, não clipado por overflow) ──────
+  function _initTooltip() {
+    if (document.getElementById('op-tip')) return;
+    const tip = document.createElement('div');
+    tip.id = 'op-tip';
+    tip.className = 'op-tooltip-float';
+    document.body.appendChild(tip);
+
+    document.addEventListener('mouseover', e => {
+      const icon = e.target.closest('.info-icon[data-tooltip]');
+      if (!icon) return;
+      tip.innerHTML = icon.dataset.tooltip;
+      tip.style.display = 'block';
+      const r = icon.getBoundingClientRect();
+      let top  = r.bottom + window.scrollY + 8;
+      let left = r.left  + window.scrollX;
+      if (left + 268 > window.innerWidth - 16) left = window.innerWidth - 268 - 16;
+      tip.style.top  = top  + 'px';
+      tip.style.left = left + 'px';
+    });
+
+    document.addEventListener('mouseout', e => {
+      if (e.target.closest('.info-icon')) tip.style.display = 'none';
+    });
+
+    document.addEventListener('scroll', () => { tip.style.display = 'none'; }, true);
+  }
+
   // ── Zonas Prioritárias ────────────────────────────────────
   async function _renderPrioridade() {
     const el = document.getElementById('op-prioridade');
     if (!el) return;
+
+    _initTooltip();
+
+    const TIP_CLASS = `
+      <b>Crescer</b> (score 55–74): zona com potencial real de crescimento do campo progressista.<br>
+      <b>Consolidar</b> (score ≥ 75): zona já forte — manter e ampliar presença.<br>
+      <b>Prospectar</b> (score &lt; 55): menor penetração atual — trabalho de longo prazo.
+    `;
+
+    const TIP_SCORE = `
+      Pontuação 0–100 calculada por:<br>
+      <b>30%</b> Tamanho do eleitorado<br>
+      <b>30%</b> % do campo progressista<br>
+      <b>20%</b> Taxa de abstenção <i>(sem dado em 2022)</i><br>
+      <b>20%</b> % de jovens 18–34<br>
+      Critério ausente (abstenção) reduz o score proporcionalmente.
+    `;
+
+    const TIP_CAMPO = `
+      Soma dos votos nominais de <b>PSOL, PT, REDE, PCdoB, UP e PSTU</b> dividida pelo total de votos nominais da zona eleitoral.<br>
+      Fonte: Eleição Deputado Estadual SP · 2022.
+    `;
+
     try {
       const [scores, res22] = await Promise.all([
         Utils.loadCSV('data/resultados/scores_ze.csv'),
@@ -158,30 +209,39 @@ const OnePage = (() => {
         'Prospectar': 'badge-prospectar',
       }[cl] || 'badge-prospectar');
 
+      el.style.overflowY = 'auto';
+      el.style.maxHeight = '340px';
+
       el.innerHTML = `
         <table class="data-table op-priority-table">
           <thead>
             <tr>
               <th style="white-space:nowrap">Zona</th>
-              <th style="white-space:nowrap">Classificação</th>
-              <th style="white-space:nowrap;text-align:right;cursor:help" title="Pontuação de prioridade (0–100): potencial de crescimento, base jovem e % do campo">Score</th>
-              <th style="white-space:nowrap;text-align:right">Campo %</th>
+              <th style="white-space:nowrap">
+                Classificação
+                <span class="info-icon" data-tooltip="${TIP_CLASS.replace(/"/g, '&quot;')}">i</span>
+              </th>
+              <th style="white-space:nowrap;text-align:right">
+                Score
+                <span class="info-icon" data-tooltip="${TIP_SCORE.replace(/"/g, '&quot;')}">i</span>
+              </th>
+              <th style="white-space:nowrap;text-align:right">
+                Campo %
+                <span class="info-icon" data-tooltip="${TIP_CAMPO.replace(/"/g, '&quot;')}">i</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             ${sorted.map(s => {
               const zona = String(s.zona).padStart(4,'0');
               const r = resMap[zona] || {};
-              const eleit = Number(r.eleitores_aptos) || 0;
               const pct   = Number(r.campo_pct) || 0;
               const score = Number(s.score) || 0;
-              const jovens = Number(s.pct_jovens) || 0;
-              const scoreTitle = `Score ${score.toFixed(0)}/100 — campo: ${pct.toFixed(1)}%, jovens: ${jovens.toFixed(0)}%, eleitores: ${Utils.fmt(eleit)}`;
               return `
                 <tr>
                   <td style="white-space:nowrap"><strong>ZE ${zona}</strong></td>
                   <td style="white-space:nowrap"><span class="badge ${badgeClass(s.classificacao)}">${s.classificacao}</span></td>
-                  <td style="white-space:nowrap;text-align:right;font-weight:600;color:var(--psol-roxo)" title="${scoreTitle}">${score.toFixed(0)}</td>
+                  <td style="white-space:nowrap;text-align:right;font-weight:600;color:var(--psol-roxo)">${score.toFixed(0)}</td>
                   <td style="white-space:nowrap;text-align:right">${pct.toFixed(1)}%</td>
                 </tr>
               `;
