@@ -162,10 +162,10 @@ const OnePage = (() => {
         <table class="data-table">
           <thead>
             <tr>
-              <th>Zona</th>
-              <th style="width:1px;white-space:nowrap">Classificação</th>
-              <th style="text-align:right;cursor:help" title="Pontuação de prioridade (0–100): potencial de crescimento, base jovem e % do campo">Score</th>
-              <th style="text-align:right">Campo %</th>
+              <th style="white-space:nowrap">Zona</th>
+              <th style="white-space:nowrap">Classificação</th>
+              <th style="white-space:nowrap;text-align:right;cursor:help" title="Pontuação de prioridade (0–100): potencial de crescimento, base jovem e % do campo">Score</th>
+              <th style="white-space:nowrap;text-align:right">Campo %</th>
             </tr>
           </thead>
           <tbody>
@@ -179,10 +179,10 @@ const OnePage = (() => {
               const scoreTitle = `Score ${score.toFixed(0)}/100 — campo: ${pct.toFixed(1)}%, jovens: ${jovens.toFixed(0)}%, eleitores: ${Utils.fmt(eleit)}`;
               return `
                 <tr>
-                  <td><strong>ZE ${zona}</strong></td>
-                  <td style="width:1px;white-space:nowrap"><span class="badge ${badgeClass(s.classificacao)}">${s.classificacao}</span></td>
-                  <td style="text-align:right;font-weight:600;color:var(--psol-roxo)" title="${scoreTitle}">${score.toFixed(0)}</td>
-                  <td style="text-align:right">${pct.toFixed(1)}%</td>
+                  <td style="white-space:nowrap"><strong>ZE ${zona}</strong></td>
+                  <td style="white-space:nowrap"><span class="badge ${badgeClass(s.classificacao)}">${s.classificacao}</span></td>
+                  <td style="white-space:nowrap;text-align:right;font-weight:600;color:var(--psol-roxo)" title="${scoreTitle}">${score.toFixed(0)}</td>
+                  <td style="white-space:nowrap;text-align:right">${pct.toFixed(1)}%</td>
                 </tr>
               `;
             }).join('')}
