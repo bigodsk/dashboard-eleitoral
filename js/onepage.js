@@ -3,7 +3,7 @@ const OnePage = (() => {
     container.innerHTML = `
       <div class="op-section-title">Resumo da campanha · Eleições 2022</div>
 
-      <div class="metrics-grid" id="op-metrics" style="margin-bottom:24px">
+      <div class="metrics-grid metrics-grid--center" id="op-metrics" style="margin-bottom:24px">
         <div class="metric-card"><div class="spinner" style="margin:8px auto"></div></div>
         <div class="metric-card"></div>
         <div class="metric-card"></div>
@@ -164,9 +164,8 @@ const OnePage = (() => {
             <tr>
               <th>Zona</th>
               <th>Classificação</th>
-              <th style="text-align:right">Score</th>
+              <th style="text-align:right" title="Pontuação de prioridade (0–100): potencial de crescimento, base jovem e % do campo">Score ⓘ</th>
               <th style="text-align:right">Campo %</th>
-              <th style="text-align:right">Jovens %</th>
             </tr>
           </thead>
           <tbody>
@@ -177,13 +176,13 @@ const OnePage = (() => {
               const pct   = Number(r.campo_pct) || 0;
               const score = Number(s.score) || 0;
               const jovens = Number(s.pct_jovens) || 0;
+              const scoreTitle = `Score ${score.toFixed(0)}/100 — campo: ${pct.toFixed(1)}%, jovens: ${jovens.toFixed(0)}%, eleitores: ${Utils.fmt(eleit)}`;
               return `
                 <tr>
                   <td><strong>ZE ${zona}</strong></td>
                   <td><span class="badge ${badgeClass(s.classificacao)}">${s.classificacao}</span></td>
-                  <td style="text-align:right;font-weight:600;color:var(--psol-roxo)">${score.toFixed(0)}</td>
+                  <td style="text-align:right;font-weight:600;color:var(--psol-roxo)" title="${scoreTitle}">${score.toFixed(0)}</td>
                   <td style="text-align:right">${pct.toFixed(1)}%</td>
-                  <td style="text-align:right;color:var(--texto-secundario)">${jovens.toFixed(0)}%</td>
                 </tr>
               `;
             }).join('')}

@@ -711,9 +711,18 @@ input[type="range"]::-webkit-slider-thumb {
   padding-left: 2px;
 }
 
+.metrics-grid--center {
+  grid-template-columns: repeat(4, minmax(0, 240px));
+  justify-content: center;
+}
+
+.metrics-grid--center .metric-card {
+  text-align: center;
+}
+
 .op-map-layout {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 1fr 320px;
   gap: 20px;
   align-items: start;
 }
