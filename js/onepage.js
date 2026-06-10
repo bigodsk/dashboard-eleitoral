@@ -12,19 +12,25 @@ const OnePage = (() => {
   };
 
   let _map = null;
-  let _mapCityGroup    = null;  // contorno município (sempre visível)
-  let _mapZonaGroup    = null;  // polígonos ZE + labels (togglável)
-  let _mapRegioesGroup = null;  // regiões OSM (togglável, lazy)
-  let _mapGroup        = null;  // Cand A markers
-  let _mapGroupB       = null;  // Cand B markers
+  let _mapCityGroup    = null;
+  let _mapZonaGroup    = null;
+  let _mapRegioesGroup = null;
+  let _mapApgGroup     = null;
+  let _mapUtbGroup     = null;
+  let _mapSehabGroup   = null;
+  let _mapGroup        = null;
+  let _mapGroupB       = null;
   let _allCands = {};
 
   const _layers = {
     candA:      true,
     candB:      true,
-    modeUrna:   true,   // true=por urna; false=por ZE apenas
+    modeUrna:   true,
     zePolygons: true,
     regioes:    false,
+    apg:        false,
+    utb:        false,
+    sehab:      false,
   };
 
   // ── render ─────────────────────────────────────────────────
@@ -66,8 +72,15 @@ const OnePage = (() => {
             <div class="map-ctrl-divider"></div>
             <div class="map-ctrl-group">
               <span class="map-ctrl-lbl">Limites</span>
-              <button class="map-ctrl-btn map-ctrl-on" id="ctrl-zonas" title="Delimitar Zonas Eleitorais">Zonas</button>
-              <button class="map-ctrl-btn" id="ctrl-regioes" title="Regiões administrativas de Campinas">Regiões</button>
+              <button class="map-ctrl-btn map-ctrl-on" id="ctrl-zonas" title="Zonas Eleitorais">Zonas</button>
+              <button class="map-ctrl-btn" id="ctrl-regioes" title="Administrações Regionais (19 ARs)">Regiões</button>
+              <button class="map-ctrl-btn" id="ctrl-apg" title="Áreas de Planejamento e Gestão (17 APGs) — com população">APGs</button>
+              <button class="map-ctrl-btn" id="ctrl-utb" title="Unidades Territoriais Básicas (93 UTBs) — com população">UTBs</button>
+            </div>
+            <div class="map-ctrl-divider"></div>
+            <div class="map-ctrl-group">
+              <span class="map-ctrl-lbl">Social</span>
+              <button class="map-ctrl-btn" id="ctrl-sehab" title="Núcleos Urbanos de Interesse Social (SEHAB)">Núcleos</button>
             </div>
           </div>
           <div class="map-container-report" id="op-map-container">
@@ -596,8 +609,11 @@ const OnePage = (() => {
 
     // Ordem das camadas (de baixo para cima)
     _mapCityGroup    = L.layerGroup().addTo(_map);
+    _mapSehabGroup   = L.layerGroup();
+    _mapApgGroup     = L.layerGroup();
+    _mapUtbGroup     = L.layerGroup();
+    _mapRegioesGroup = L.layerGroup();
     _mapZonaGroup    = L.layerGroup().addTo(_map);
-    _mapRegioesGroup = L.layerGroup();  // não adicionado ao map ainda (off por padrão)
     _mapGroup        = L.layerGroup().addTo(_map);
     _mapGroupB       = L.layerGroup().addTo(_map);
 
@@ -671,6 +687,42 @@ const OnePage = (() => {
         _map.removeLayer(_mapRegioesGroup);
       }
     });
+
+    // Toggle APGs (lazy-load)
+    document.getElementById('ctrl-apg')?.addEventListener('click', async () => {
+      _layers.apg = !_layers.apg;
+      document.getElementById('ctrl-apg').classList.toggle('map-ctrl-on', _layers.apg);
+      if (_layers.apg) {
+        if (_mapApgGroup.getLayers().length === 0) await _addApg();
+        _mapApgGroup.addTo(_map);
+      } else {
+        _map.removeLayer(_mapApgGroup);
+      }
+    });
+
+    // Toggle UTBs (lazy-load)
+    document.getElementById('ctrl-utb')?.addEventListener('click', async () => {
+      _layers.utb = !_layers.utb;
+      document.getElementById('ctrl-utb').classList.toggle('map-ctrl-on', _layers.utb);
+      if (_layers.utb) {
+        if (_mapUtbGroup.getLayers().length === 0) await _addUtb();
+        _mapUtbGroup.addTo(_map);
+      } else {
+        _map.removeLayer(_mapUtbGroup);
+      }
+    });
+
+    // Toggle Núcleos SEHAB (lazy-load)
+    document.getElementById('ctrl-sehab')?.addEventListener('click', async () => {
+      _layers.sehab = !_layers.sehab;
+      document.getElementById('ctrl-sehab').classList.toggle('map-ctrl-on', _layers.sehab);
+      if (_layers.sehab) {
+        if (_mapSehabGroup.getLayers().length === 0) await _addSehab();
+        _mapSehabGroup.addTo(_map);
+      } else {
+        _map.removeLayer(_mapSehabGroup);
+      }
+    });
   }
 
   // ── Contorno do município ───────────────────────────────────
@@ -731,6 +783,89 @@ const OnePage = (() => {
         },
       }).addTo(_mapRegioesGroup);
     } catch { /* sem regioes */ }
+  }
+
+  // ── Escala de cor por população ────────────────────────────
+  function _popColor(value, min, max, h, s) {
+    const t = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
+    const l = Math.round(88 - t * 52);
+    return `hsl(${h},${s}%,${l}%)`;
+  }
+
+  // ── APGs com choropleth de população ───────────────────────
+  async function _addApg() {
+    try {
+      const r = await fetch('data/geo/campinas_pop_apg.geojson');
+      if (!r.ok) return;
+      const gj = await r.json();
+      const pops = gj.features.map(f => f.properties.POP_2022 || 0);
+      const [mn, mx] = [Math.min(...pops), Math.max(...pops)];
+
+      L.geoJSON(gj, {
+        style: f => {
+          const fill = _popColor(f.properties.POP_2022 || 0, mn, mx, 210, 65);
+          return { color: '#1D4ED8', weight: 1.5, dashArray: '6 3', fillColor: fill, fillOpacity: 0.45, opacity: 0.8 };
+        },
+        onEachFeature: (feature, layer) => {
+          const p = feature.properties;
+          const pop = p.POP_2022 ? Utils.fmt(p.POP_2022) : '—';
+          const var_ = p.VAR_PERC_P ? `+${Number(p.VAR_PERC_P).toFixed(0)}% desde 1970` : '';
+          const label = `<strong>${p.APG || p.NOME_COMPL}</strong><br>Pop. 2022: ${pop}${var_ ? '<br>' + var_ : ''}`;
+          layer.bindTooltip(label, { sticky: true, className: 'map-tooltip' });
+          const orig = { color: '#1D4ED8', weight: 1.5, dashArray: '6 3', fillColor: _popColor(p.POP_2022||0, mn, mx, 210, 65), fillOpacity: 0.45, opacity: 0.8 };
+          const hover = { ...orig, weight: 2.5, dashArray: null, fillOpacity: 0.65, opacity: 1 };
+          layer.on('mouseover', () => layer.setStyle(hover));
+          layer.on('mouseout',  () => layer.setStyle(orig));
+        },
+      }).addTo(_mapApgGroup);
+    } catch { /* sem APG */ }
+  }
+
+  // ── UTBs com choropleth de população ───────────────────────
+  async function _addUtb() {
+    try {
+      const r = await fetch('data/geo/campinas_pop_utb.geojson');
+      if (!r.ok) return;
+      const gj = await r.json();
+      const pops = gj.features.map(f => f.properties.POP_2022 || 0).filter(v => v > 0);
+      const [mn, mx] = [Math.min(...pops), Math.max(...pops)];
+
+      L.geoJSON(gj, {
+        style: f => {
+          const fill = _popColor(f.properties.POP_2022 || 0, mn, mx, 160, 55);
+          return { color: '#065F46', weight: 1, dashArray: '4 3', fillColor: fill, fillOpacity: 0.40, opacity: 0.7 };
+        },
+        onEachFeature: (feature, layer) => {
+          const p = feature.properties;
+          const pop = p.POP_2022 ? Utils.fmt(p.POP_2022) : '—';
+          layer.bindTooltip(`<strong>${p.UTB_SIGLA}</strong><br>Pop. 2022: ${pop}`, { sticky: true, className: 'map-tooltip' });
+          const orig = { color: '#065F46', weight: 1, dashArray: '4 3', fillColor: _popColor(p.POP_2022||0, mn, mx, 160, 55), fillOpacity: 0.40, opacity: 0.7 };
+          const hover = { ...orig, weight: 2, dashArray: null, fillOpacity: 0.60, opacity: 1 };
+          layer.on('mouseover', () => layer.setStyle(hover));
+          layer.on('mouseout',  () => layer.setStyle(orig));
+        },
+      }).addTo(_mapUtbGroup);
+    } catch { /* sem UTB */ }
+  }
+
+  // ── Núcleos Urbanos SEHAB ───────────────────────────────────
+  async function _addSehab() {
+    try {
+      const r = await fetch('data/geo/campinas_nucleos_sehab.geojson');
+      if (!r.ok) return;
+      const gj = await r.json();
+      const styleN = { color: '#B45309', weight: 1, dashArray: null, fillColor: '#FDE68A', fillOpacity: 0.55, opacity: 0.8 };
+      const styleH = { color: '#92400E', weight: 2, fillColor: '#FCD34D', fillOpacity: 0.75, opacity: 1 };
+      L.geoJSON(gj, {
+        style: styleN,
+        onEachFeature: (feature, layer) => {
+          const nome = feature.properties?.NOME_AREA || '';
+          if (nome) layer.bindTooltip(nome, { sticky: true, className: 'map-tooltip' });
+          layer.on('mouseover', () => layer.setStyle(styleH));
+          layer.on('mouseout',  () => layer.setStyle(styleN));
+        },
+      }).addTo(_mapSehabGroup);
+    } catch { /* sem SEHAB */ }
   }
 
   // ── Hull convexo (Andrew's monotone chain) ──────────────────
