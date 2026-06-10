@@ -941,6 +941,79 @@ input[type="range"]::-webkit-slider-thumb {
 .map-container-report {
   height: 340px;
   background: #1a1a2e;
+  position: relative;
+  transition: height 0.3s ease;
+}
+
+.map-container-report.map-expanded {
+  height: calc(100vh - 220px);
+}
+
+/* ── Botão ampliar mapa ── */
+.map-expand-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--borda);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--texto-secundario);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.map-expand-btn:hover {
+  background: var(--psol-roxo-claro);
+  color: var(--psol-roxo);
+  border-color: var(--psol-roxo);
+}
+
+/* ── Legenda do mapa ── */
+.map-legend {
+  position: absolute;
+  bottom: 28px;
+  left: 10px;
+  z-index: 500;
+  background: rgba(255,255,255,0.93);
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  padding: 7px 11px;
+  font-size: 11px;
+  pointer-events: none;
+  min-width: 120px;
+}
+
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  line-height: 1.3;
+}
+
+.map-legend-item + .map-legend-item {
+  margin-top: 4px;
+}
+
+.map-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(0,0,0,0.25);
+}
+
+/* ── Labels de ZE no mapa ── */
+.zone-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  color: #4C1D95;
+  background: transparent;
+  border: none;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 #op-map {

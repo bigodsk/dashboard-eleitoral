@@ -12,7 +12,9 @@ const OnePage = (() => {
   };
 
   let _map = null;
-  let _mapGroup = null;
+  let _mapGroup  = null;  // Cand A markers
+  let _mapGroupB = null;  // Cand B markers
+  let _mapBoundaryGroup = null; // city boundary + zone polygons (static)
   let _allCands = {};
 
   // ── render ─────────────────────────────────────────────────
@@ -30,12 +32,15 @@ const OnePage = (() => {
       </div>
 
       <div class="op-map-layout" style="margin-bottom:24px">
-        <div class="content-card" style="overflow:hidden">
+        <div class="content-card" style="overflow:hidden" id="op-map-card">
           <div class="content-card-header">
             <span class="content-card-title" id="op-map-title">Distribuição de Votos</span>
-            <span style="font-size:11px;color:var(--texto-secundario)">intensidade = votos no local de votação</span>
+            <button class="map-expand-btn" id="op-map-expand" title="Ampliar mapa">&#x2922;</button>
           </div>
-          <div class="map-container-report"><div id="op-map"></div></div>
+          <div class="map-container-report" id="op-map-container">
+            <div id="op-map"></div>
+            <div class="map-legend" id="op-map-legend" style="display:none"></div>
+          </div>
         </div>
 
         <div class="content-card">
@@ -545,7 +550,7 @@ const OnePage = (() => {
     Charts.horizontalBar(ctx, paired.map(p => p[0]), paired.map(p => p[1]), '#7C3AED');
   }
 
-  // ── Mapa ────────────────────────────────────────────────────
+  // ── Mapa — inicialização ────────────────────────────────────
   async function _renderMapa() {
     const mapEl = document.getElementById('op-map');
     if (!mapEl || _map) return;
@@ -555,68 +560,168 @@ const OnePage = (() => {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 19,
     }).addTo(_map);
-    _mapGroup = L.layerGroup().addTo(_map);
+
+    _mapBoundaryGroup = L.layerGroup().addTo(_map); // city + zones (estático)
+    _mapGroup  = L.layerGroup().addTo(_map);        // Cand A
+    _mapGroupB = L.layerGroup().addTo(_map);        // Cand B
+
     setTimeout(() => _map.invalidateSize(), 150);
 
+    // Botão de ampliar
+    const expandBtn = document.getElementById('op-map-expand');
+    if (expandBtn) {
+      expandBtn.addEventListener('click', () => {
+        const mc = document.getElementById('op-map-container');
+        const expanded = mc.classList.toggle('map-expanded');
+        expandBtn.innerHTML = expanded ? '&#x2715;' : '&#x2922;';
+        expandBtn.title = expanded ? 'Reduzir mapa' : 'Ampliar mapa';
+        setTimeout(() => _map.invalidateSize(), 320);
+        if (expanded) mc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    }
+
+    await Promise.all([_addCityBoundary(), _addZoneBoundaries()]);
     await _renderMapaUpdate();
   }
 
+  // ── Contorno do município ───────────────────────────────────
+  async function _addCityBoundary() {
+    try {
+      const r = await fetch('data/geo/campinas_municipio.geojson');
+      if (!r.ok) return;
+      const gj = await r.json();
+      L.geoJSON(gj, {
+        style: { color: '#7C3AED', weight: 2.5, dashArray: '8 5', fillOpacity: 0, opacity: 0.65 },
+      }).addTo(_mapBoundaryGroup);
+    } catch { /* sem contorno */ }
+  }
+
+  // ── Zonas eleitorais (hull convexo + label) ─────────────────
+  async function _addZoneBoundaries() {
+    try {
+      const r = await fetch('data/geo/locais_votos_2022.geojson');
+      if (!r.ok) return;
+      const gj = await r.json();
+
+      const byZone = {};
+      gj.features.forEach(f => {
+        const z = String(f.properties.nr_zona).padStart(4, '0');
+        const [lng, lat] = f.geometry.coordinates;
+        if (!byZone[z]) byZone[z] = [];
+        byZone[z].push([lng, lat]);
+      });
+
+      Object.entries(byZone).forEach(([zona, pts]) => {
+        const hull = _convexHull(pts);
+        if (hull.length < 3) return;
+        L.polygon(hull.map(([lng, lat]) => [lat, lng]), {
+          color: '#7C3AED', weight: 1.2, dashArray: '5 4',
+          fillColor: '#EDE9FE', fillOpacity: 0.06, opacity: 0.4,
+        }).addTo(_mapBoundaryGroup);
+
+        const cx = hull.reduce((s, p) => s + p[0], 0) / hull.length;
+        const cy = hull.reduce((s, p) => s + p[1], 0) / hull.length;
+        L.marker([cy, cx], {
+          icon: L.divIcon({
+            html: `<span class="zone-lbl">ZE ${zona}</span>`,
+            className: '', iconSize: [50, 14], iconAnchor: [25, 7],
+          }),
+          interactive: false,
+        }).addTo(_mapBoundaryGroup);
+      });
+    } catch { /* sem zonas */ }
+  }
+
+  // ── Hull convexo (Andrew's monotone chain) ──────────────────
+  function _convexHull(pts) {
+    if (pts.length < 3) return pts;
+    const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cross = (o, a, b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+    const lower = [];
+    for (const pt of p) {
+      while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], pt) <= 0) lower.pop();
+      lower.push(pt);
+    }
+    const upper = [];
+    for (let i = p.length-1; i >= 0; i--) {
+      const pt = p[i];
+      while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], pt) <= 0) upper.pop();
+      upper.push(pt);
+    }
+    lower.pop(); upper.pop();
+    return [...lower, ...upper];
+  }
+
+  // ── Atualiza candidatos no mapa ─────────────────────────────
   async function _renderMapaUpdate() {
-    if (!_map || !_mapGroup) return;
+    if (!_map) return;
     _mapGroup.clearLayers();
+    _mapGroupB.clearLayers();
 
     const a = _st.candA;
-    if (!a) return;
+    const b = _st.candB;
 
-    const isEdiane = a.nr === '50110' && _st.yearA === '2022';
-    const isThamy  = a.nr === '50019' && _st.yearA === '2024';
+    const boundsA = a ? await _renderMapCand(a, _st.yearA, _mapGroup,  '#7C3AED', '#4C1D95', '#FACC15', true)  : [];
+    const boundsB = b ? await _renderMapCand(b, _st.yearB, _mapGroupB, '#D97706', '#92400E', '#FCD34D', false) : [];
+
+    const allBounds = [...boundsA, ...boundsB];
+    if (allBounds.length) _map.fitBounds(L.latLngBounds(allBounds), { padding: [36, 36] });
+
+    _updateMapLegend(a, b);
+  }
+
+  // ── Renderiza um candidato no mapa ──────────────────────────
+  async function _renderMapCand(cand, year, group, fillColor, borderColor, heatColor, showHeat) {
+    const bounds = [];
+    const isEdiane = cand.nr === '50110' && year === '2022';
+    const isThamy  = cand.nr === '50019' && year === '2024';
 
     if (isEdiane || isThamy) {
-      // Per-location heatmap para candidatas com GeoJSON pré-computado
       const gjFile = isEdiane ? 'data/geo/locais_votos_2022.geojson' : 'data/geo/locais_votos_2024.geojson';
       const vField  = isEdiane ? 'votos_ediane' : 'votos_thamy';
       try {
         const r = await fetch(gjFile);
-        if (!r.ok) return;
+        if (!r.ok) return bounds;
         const gj = await r.json();
         const pts = gj.features.filter(f => (f.properties[vField]||0) >= 1);
-        if (!pts.length) return;
-        const maxV = Math.max(...pts.map(f => f.properties[vField]), 1);
+        if (!pts.length) return bounds;
+        const maxV = Math.max(...pts.map(f => f.properties[vField]||0), 1);
 
-        L.heatLayer(pts.map(f => {
-          const [lng, lat] = f.geometry.coordinates;
-          return [lat, lng, f.properties[vField] / maxV];
-        }), { radius: 30, blur: 20, minOpacity: 0.3, max: 1.0,
-              gradient: { 0.2: '#6D28D9', 0.5: '#8B5CF6', 0.8: '#C4B5FD', 1.0: '#FACC15' } })
-          .addTo(_mapGroup);
+        if (showHeat) {
+          L.heatLayer(pts.map(f => {
+            const [lng, lat] = f.geometry.coordinates;
+            return [lat, lng, (f.properties[vField]||0) / maxV];
+          }), {
+            radius: 35, blur: 25, minOpacity: 0.25, max: 1.0,
+            gradient: { 0.2: '#6D28D9', 0.5: '#8B5CF6', 0.8: '#C4B5FD', 1.0: heatColor },
+          }).addTo(group);
+        }
 
         pts.forEach(f => {
           const [lng, lat] = f.geometry.coordinates;
           const v = f.properties[vField];
-          const rd = Math.max(4, Math.round(3 + (v / maxV) * 8));
+          const rd = Math.max(3, Math.round(3 + (v / maxV) * 9));
           L.circleMarker([lat, lng], {
-            radius: rd, fillColor: '#FACC15', color: '#4C1D95', weight: 1, fillOpacity: 0.85,
-          }).bindTooltip(`<strong>${v} votos</strong><br>ZE ${f.properties.nr_zona} · Local ${f.properties.nr_local}`, { direction: 'top' })
-            .addTo(_mapGroup);
+            radius: rd, fillColor: fillColor, color: borderColor, weight: 1, fillOpacity: 0.85,
+          }).bindTooltip(
+            `<strong>${v} votos</strong><br>ZE ${String(f.properties.nr_zona).padStart(4,'0')} · Local ${f.properties.nr_local}`,
+            { direction: 'top' }
+          ).addTo(group);
+          bounds.push([lat, lng]);
         });
-
-        _map.fitBounds(L.latLngBounds(pts.map(f => {
-          const [lng, lat] = f.geometry.coordinates; return [lat, lng];
-        })), { padding: [32, 32] });
-      } catch { /* sem mapa */ }
+      } catch { /* sem dados */ }
 
     } else {
-      // Círculos por zona (centroide calculado a partir do GeoJSON)
+      // Círculos por zona eleitoral (centroide)
       try {
-        const gjYear = _st.yearA === '2024' ? '2024' : '2022';
+        const gjYear = year === '2024' ? '2024' : '2022';
         const [gjResp, nomCSV] = await Promise.all([
           fetch(`data/geo/locais_votos_${gjYear}.geojson`),
-          Utils.loadCSV(`data/resultados/votos_nominais_ze_${_st.yearA}.csv`).catch(() => []),
+          Utils.loadCSV(`data/resultados/votos_nominais_ze_${year}.csv`).catch(() => []),
         ]);
-        if (!gjResp.ok) return;
+        if (!gjResp.ok) return bounds;
         const gj = await gjResp.json();
 
-        // Calcula centroide de cada zona
         const acc = {};
         gj.features.forEach(f => {
           const z = String(f.properties.nr_zona).padStart(4,'0');
@@ -625,30 +730,38 @@ const OnePage = (() => {
           acc[z].lat += lat; acc[z].lng += lng; acc[z].n++;
         });
         const centroids = {};
-        Object.entries(acc).forEach(([z, c]) => { centroids[z] = [c.lat / c.n, c.lng / c.n]; });
+        Object.entries(acc).forEach(([z, c]) => { centroids[z] = [c.lat/c.n, c.lng/c.n]; });
 
-        // Votos do candidato por zona
         const zv = {};
-        nomCSV.filter(d => String(d.nr_candidato).trim() === a.nr)
+        nomCSV.filter(d => String(d.nr_candidato).trim() === cand.nr)
               .forEach(d => { zv[String(d.zona).padStart(4,'0')] = Number(d.votos)||0; });
 
         const maxV = Math.max(...Object.values(zv), 1);
-        const bounds = [];
-
         Object.entries(centroids).forEach(([z, [lat, lng]]) => {
           const v = zv[z] || 0;
           if (!v) return;
-          const rd = Math.max(8, Math.round(8 + (v / maxV) * 24));
+          const rd = Math.max(8, Math.round(8 + (v / maxV) * 22));
           L.circleMarker([lat, lng], {
-            radius: rd, fillColor: '#7C3AED', color: '#4C1D95', weight: 1.5, fillOpacity: 0.65,
+            radius: rd, fillColor: fillColor, color: borderColor, weight: 1.5, fillOpacity: 0.65,
           }).bindTooltip(`<strong>${Utils.fmt(v)} votos</strong><br>ZE ${z}`, { direction: 'top' })
-            .addTo(_mapGroup);
+            .addTo(group);
           bounds.push([lat, lng]);
         });
-
-        if (bounds.length) _map.fitBounds(L.latLngBounds(bounds), { padding: [48, 48] });
-      } catch { /* sem mapa */ }
+      } catch { /* sem dados */ }
     }
+    return bounds;
+  }
+
+  // ── Legenda do mapa ─────────────────────────────────────────
+  function _updateMapLegend(a, b) {
+    const el = document.getElementById('op-map-legend');
+    if (!el) return;
+    if (!a && !b) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = [
+      a ? `<div class="map-legend-item"><span class="map-legend-dot" style="background:#7C3AED;border-color:#4C1D95"></span>${a.nm}</div>` : '',
+      b ? `<div class="map-legend-item"><span class="map-legend-dot" style="background:#D97706;border-color:#92400E"></span>${b.nm}</div>` : '',
+    ].join('');
   }
 
   return { render };
