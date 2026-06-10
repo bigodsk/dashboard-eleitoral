@@ -700,17 +700,12 @@ const OnePage = (() => {
         byZone[z].push([lng, lat]);
       });
 
-      const styleNormal = { color: '#7C3AED', weight: 1.2, dashArray: '5 4', fillColor: '#EDE9FE', fillOpacity: 0.06, opacity: 0.4 };
-      const styleHover  = { color: '#5B21B6', weight: 2,   dashArray: null,   fillColor: '#C4B5FD', fillOpacity: 0.28, opacity: 0.9 };
+      const style = { color: '#7C3AED', weight: 1.2, dashArray: '5 4', fillColor: '#EDE9FE', fillOpacity: 0.06, opacity: 0.4, interactive: false };
 
       Object.entries(byZone).forEach(([zona, pts]) => {
         const hull = _convexHull(pts);
         if (hull.length < 3) return;
-        const poly = L.polygon(hull.map(([lng, lat]) => [lat, lng]), styleNormal);
-        poly.bindTooltip(`Zona Eleitoral ${zona}`, { sticky: true, className: 'map-tooltip' });
-        poly.on('mouseover', () => poly.setStyle(styleHover));
-        poly.on('mouseout',  () => poly.setStyle(styleNormal));
-        poly.addTo(_mapZonaGroup);
+        L.polygon(hull.map(([lng, lat]) => [lat, lng]), style).addTo(_mapZonaGroup);
       });
     } catch { /* sem zonas */ }
   }
