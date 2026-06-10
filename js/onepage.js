@@ -669,50 +669,37 @@ const OnePage = (() => {
       _renderMapaUpdate();
     });
 
-    // Toggle zonas eleitorais
-    document.getElementById('ctrl-zonas')?.addEventListener('click', () => {
-      _layers.zePolygons = !_layers.zePolygons;
-      document.getElementById('ctrl-zonas').classList.toggle('map-ctrl-on', _layers.zePolygons);
-      _layers.zePolygons ? _mapZonaGroup.addTo(_map) : _map.removeLayer(_mapZonaGroup);
+    // Camadas territoriais — comportamento de rádio (só uma ativa por vez)
+    const _terrConfig = [
+      { id: 'ctrl-zonas',   key: 'zePolygons', group: () => _mapZonaGroup,    loader: null       },
+      { id: 'ctrl-regioes', key: 'regioes',    group: () => _mapRegioesGroup, loader: _addRegioes },
+      { id: 'ctrl-apg',     key: 'apg',        group: () => _mapApgGroup,     loader: _addApg    },
+      { id: 'ctrl-utb',     key: 'utb',        group: () => _mapUtbGroup,     loader: _addUtb    },
+    ];
+
+    const _deactivateTerr = () => {
+      _terrConfig.forEach(cfg => {
+        _layers[cfg.key] = false;
+        document.getElementById(cfg.id)?.classList.remove('map-ctrl-on');
+        if (_map.hasLayer(cfg.group())) _map.removeLayer(cfg.group());
+      });
+    };
+
+    _terrConfig.forEach(cfg => {
+      document.getElementById(cfg.id)?.addEventListener('click', async () => {
+        const wasOn = _layers[cfg.key];
+        _deactivateTerr();
+        if (!wasOn) {
+          _layers[cfg.key] = true;
+          document.getElementById(cfg.id).classList.add('map-ctrl-on');
+          const grp = cfg.group();
+          if (cfg.loader && grp.getLayers().length === 0) await cfg.loader();
+          grp.addTo(_map);
+        }
+      });
     });
 
-    // Toggle regiões (lazy-load)
-    document.getElementById('ctrl-regioes')?.addEventListener('click', async () => {
-      _layers.regioes = !_layers.regioes;
-      document.getElementById('ctrl-regioes').classList.toggle('map-ctrl-on', _layers.regioes);
-      if (_layers.regioes) {
-        if (_mapRegioesGroup.getLayers().length === 0) await _addRegioes();
-        _mapRegioesGroup.addTo(_map);
-      } else {
-        _map.removeLayer(_mapRegioesGroup);
-      }
-    });
-
-    // Toggle APGs (lazy-load)
-    document.getElementById('ctrl-apg')?.addEventListener('click', async () => {
-      _layers.apg = !_layers.apg;
-      document.getElementById('ctrl-apg').classList.toggle('map-ctrl-on', _layers.apg);
-      if (_layers.apg) {
-        if (_mapApgGroup.getLayers().length === 0) await _addApg();
-        _mapApgGroup.addTo(_map);
-      } else {
-        _map.removeLayer(_mapApgGroup);
-      }
-    });
-
-    // Toggle UTBs (lazy-load)
-    document.getElementById('ctrl-utb')?.addEventListener('click', async () => {
-      _layers.utb = !_layers.utb;
-      document.getElementById('ctrl-utb').classList.toggle('map-ctrl-on', _layers.utb);
-      if (_layers.utb) {
-        if (_mapUtbGroup.getLayers().length === 0) await _addUtb();
-        _mapUtbGroup.addTo(_map);
-      } else {
-        _map.removeLayer(_mapUtbGroup);
-      }
-    });
-
-    // Toggle Núcleos SEHAB (lazy-load)
+    // Núcleos SEHAB — toggle independente (combina com qualquer camada territorial)
     document.getElementById('ctrl-sehab')?.addEventListener('click', async () => {
       _layers.sehab = !_layers.sehab;
       document.getElementById('ctrl-sehab').classList.toggle('map-ctrl-on', _layers.sehab);
