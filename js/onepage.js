@@ -150,7 +150,7 @@ const OnePage = (() => {
       const resMap = {};
       res22.forEach(d => { resMap[String(d.zona).padStart(4,'0')] = d; });
 
-      const sorted = [...scores].sort((a, b) => (Number(b.score_total) || 0) - (Number(a.score_total) || 0));
+      const sorted = [...scores].sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
 
       const badgeClass = cl => ({
         'Consolidar': 'badge-consolidar',
@@ -164,9 +164,9 @@ const OnePage = (() => {
             <tr>
               <th>Zona</th>
               <th>Classificação</th>
-              <th>Score</th>
-              <th>Campo %</th>
-              <th>Eleitores</th>
+              <th style="text-align:right">Score</th>
+              <th style="text-align:right">Campo %</th>
+              <th style="text-align:right">Jovens %</th>
             </tr>
           </thead>
           <tbody>
@@ -175,19 +175,15 @@ const OnePage = (() => {
               const r = resMap[zona] || {};
               const eleit = Number(r.eleitores_aptos) || 0;
               const pct   = Number(r.campo_pct) || 0;
-              const score = Number(s.score_total) || 0;
+              const score = Number(s.score) || 0;
+              const jovens = Number(s.pct_jovens) || 0;
               return `
                 <tr>
                   <td><strong>ZE ${zona}</strong></td>
                   <td><span class="badge ${badgeClass(s.classificacao)}">${s.classificacao}</span></td>
-                  <td>
-                    <div class="score-bar-cell">
-                      <div class="score-bar"><div class="score-bar-fill" style="width:${score}%"></div></div>
-                      <span style="font-size:12px;font-weight:600;min-width:32px">${score.toFixed(0)}</span>
-                    </div>
-                  </td>
-                  <td>${pct.toFixed(1)}%</td>
-                  <td>${Utils.fmt(eleit)}</td>
+                  <td style="text-align:right;font-weight:600;color:var(--psol-roxo)">${score.toFixed(0)}</td>
+                  <td style="text-align:right">${pct.toFixed(1)}%</td>
+                  <td style="text-align:right;color:var(--texto-secundario)">${jovens.toFixed(0)}%</td>
                 </tr>
               `;
             }).join('')}
@@ -327,10 +323,11 @@ const OnePage = (() => {
         });
 
       L.heatLayer(pontos, {
-        radius: 28,
-        blur: 20,
-        maxZoom: 16,
-        gradient: { 0.0: '#1e1148', 0.3: '#7C3AED', 0.6: '#A78BFA', 1.0: '#FACC15' },
+        radius: 35,
+        blur: 22,
+        minOpacity: 0.35,
+        max: 1.0,
+        gradient: { 0.2: '#6D28D9', 0.5: '#8B5CF6', 0.8: '#C4B5FD', 1.0: '#FACC15' },
       }).addTo(map);
 
       // Círculos clicáveis nos 10 maiores locais
