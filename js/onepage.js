@@ -163,7 +163,7 @@ const OnePage = (() => {
           <thead>
             <tr>
               <th>Zona</th>
-              <th>Classificação</th>
+              <th style="width:1px;white-space:nowrap">Classificação</th>
               <th style="text-align:right;cursor:help" title="Pontuação de prioridade (0–100): potencial de crescimento, base jovem e % do campo">Score</th>
               <th style="text-align:right">Campo %</th>
             </tr>
@@ -180,7 +180,7 @@ const OnePage = (() => {
               return `
                 <tr>
                   <td><strong>ZE ${zona}</strong></td>
-                  <td><span class="badge ${badgeClass(s.classificacao)}">${s.classificacao}</span></td>
+                  <td style="width:1px;white-space:nowrap"><span class="badge ${badgeClass(s.classificacao)}">${s.classificacao}</span></td>
                   <td style="text-align:right;font-weight:600;color:var(--psol-roxo)" title="${scoreTitle}">${score.toFixed(0)}</td>
                   <td style="text-align:right">${pct.toFixed(1)}%</td>
                 </tr>

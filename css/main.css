@@ -724,7 +724,17 @@ input[type="range"]::-webkit-slider-thumb {
   display: grid;
   grid-template-columns: minmax(0, 620px) 1fr;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.op-map-layout .content-card:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.op-map-layout .content-card:last-child #op-prioridade {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .map-container-report {
