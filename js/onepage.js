@@ -159,7 +159,7 @@ const OnePage = (() => {
       }[cl] || 'badge-prospectar');
 
       el.innerHTML = `
-        <table class="data-table">
+        <table class="data-table op-priority-table">
           <thead>
             <tr>
               <th style="white-space:nowrap">Zona</th>
