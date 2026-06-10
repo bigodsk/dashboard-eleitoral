@@ -696,6 +696,9 @@ input[type="range"]::-webkit-slider-thumb {
   margin: 0 auto;
   padding: 28px 28px 48px;
   width: 100%;
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
 }
 
 .op-section-title {
