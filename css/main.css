@@ -624,11 +624,114 @@ input[type="range"]::-webkit-slider-thumb {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── One-page report layout ── */
+.report-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 56px;
+  background: var(--nav-bg);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 28px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.topbar-sep {
+  color: rgba(255,255,255,0.3);
+  font-size: 14px;
+}
+
+.topbar-sub {
+  color: var(--psol-roxo-medio);
+  font-size: 13px;
+}
+
+.topbar-candidate {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  justify-content: center;
+}
+
+.topbar-cand-name {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.topbar-cand-meta {
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+}
+
+.topbar-badge {
+  background: var(--psol-amarelo);
+  color: var(--psol-amarelo-esc);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 4px;
+}
+
+.report-main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 28px 48px;
+  width: 100%;
+}
+
+.op-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--texto-secundario);
+  margin-bottom: 12px;
+  padding-left: 2px;
+}
+
+.op-map-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+.map-container-report {
+  height: 440px;
+  background: #1a1a2e;
+}
+
+#op-map {
+  height: 100%;
+  width: 100%;
+}
+
 /* ── Responsividade ── */
 @media (max-width: 960px) {
   .sidebar { width: 60px; }
   .sidebar-logo-title, .sidebar-logo-sub, .sidebar-logo-badge, .nav-item span:not(.nav-icon) { display: none; }
   .nav-item { justify-content: center; padding: 10px; }
-  .two-col, .three-col { grid-template-columns: 1fr; }
+  .two-col, .three-col, .op-map-layout { grid-template-columns: 1fr; }
   .ze-layout { grid-template-columns: 1fr; }
+  .report-main { padding: 16px; }
+  .topbar-candidate { display: none; }
 }
