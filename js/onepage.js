@@ -55,6 +55,8 @@ const OnePage = (() => {
         </div>
       </div>
 
+      <div class="op-section-title" style="margin-top:8px;margin-bottom:16px">Dados Eleitorais Gerais de Campinas</div>
+
       <div class="three-col" style="margin-bottom:24px">
         <div class="content-card">
           <div class="content-card-header"><span class="content-card-title">Sexo dos Eleitores</span></div>
@@ -68,11 +70,6 @@ const OnePage = (() => {
           <div class="content-card-header"><span class="content-card-title">Escolaridade — Campinas</span></div>
           <div class="content-card-body"><div class="chart-container"><canvas id="op-chart-esc"></canvas></div></div>
         </div>
-      </div>
-
-      <div class="disclaimer">
-        <span class="disclaimer-icon">⚠</span>
-        <span>Análise por território (zona/seção eleitoral). Correlações geográficas — o TSE não divulga para quem cada eleitor votou. Use como orientação estratégica.</span>
       </div>
     `;
 
@@ -91,6 +88,92 @@ const OnePage = (() => {
     _renderMapa();
   }
 
+  // ── Combobox com busca ─────────────────────────────────────
+  function _searchSelect(wrapperId, list, selectedNr, includeNone, onSelect) {
+    const wrapper = document.getElementById(wrapperId);
+    if (!wrapper) return () => {};
+
+    let currentNr = String(selectedNr || '');
+    let isOpen = false;
+
+    const input    = wrapper.querySelector('.ss-input');
+    const dropdown = wrapper.querySelector('.ss-dropdown');
+
+    function findCand(nr) {
+      return (list || []).find(c => String(c.nr_candidato) === String(nr)) || null;
+    }
+
+    function label(c) {
+      return c ? `${c.nm_candidato} (${c.sg_partido})` : '— sem comparação —';
+    }
+
+    function renderList(filter) {
+      const f = (filter || '').toLowerCase().trim();
+      let items = list || [];
+      if (f) items = items.filter(c =>
+        c.nm_candidato.toLowerCase().includes(f) ||
+        (c.sg_partido || '').toLowerCase().includes(f)
+      );
+
+      const noneHtml = includeNone
+        ? `<div class="ss-item${!currentNr ? ' ss-selected' : ''}" data-nr="">— sem comparação —</div>`
+        : '';
+
+      dropdown.innerHTML = noneHtml + (items.length
+        ? items.map(c =>
+            `<div class="ss-item${String(c.nr_candidato) === currentNr ? ' ss-selected' : ''}" data-nr="${c.nr_candidato}">${c.nm_candidato} <span class="ss-partido">(${c.sg_partido})</span></div>`
+          ).join('')
+        : '<div class="ss-empty">Nenhum resultado</div>');
+    }
+
+    function open() {
+      if (isOpen) return;
+      isOpen = true;
+      dropdown.classList.add('ss-open');
+      renderList('');
+      const sel = dropdown.querySelector('.ss-selected');
+      if (sel) sel.scrollIntoView({ block: 'nearest' });
+    }
+
+    function close() {
+      if (!isOpen) return;
+      isOpen = false;
+      dropdown.classList.remove('ss-open');
+      input.value = label(findCand(currentNr));
+    }
+
+    function select(nr) {
+      currentNr = nr || '';
+      close();
+      onSelect(currentNr);
+    }
+
+    // Seed input with current selection
+    input.value = label(findCand(currentNr));
+
+    input.addEventListener('focus', () => { input.select(); open(); });
+    input.addEventListener('input', () => { if (!isOpen) open(); renderList(input.value); });
+
+    dropdown.addEventListener('mousedown', e => {
+      const item = e.target.closest('.ss-item');
+      if (!item) return;
+      e.preventDefault();
+      select(item.dataset.nr);
+    });
+
+    document.addEventListener('click', e => {
+      if (!wrapper.contains(e.target)) close();
+    }, true);
+
+    // Return update function for when the list changes (year switch)
+    return function update(newList, newNr) {
+      list = newList;
+      currentNr = String(newNr || '');
+      input.value = label(findCand(currentNr));
+      if (isOpen) renderList('');
+    };
+  }
+
   // ── Candidatos ─────────────────────────────────────────────
   async function _loadAllCands() {
     const [c22, c24] = await Promise.all([
@@ -102,6 +185,9 @@ const OnePage = (() => {
   }
 
   // ── Barra de filtros ────────────────────────────────────────
+  let _updateCandA = () => {};
+  let _updateCandB = () => {};
+
   function _buildFilterBar() {
     const bar = document.getElementById('op-filter-bar');
     if (!bar) return;
@@ -114,9 +200,10 @@ const OnePage = (() => {
             <option value="2022" selected>2022 · Dep. Estadual</option>
             <option value="2024">2024 · Vereador</option>
           </select>
-          <select class="filter-select filter-select--cand" id="f-cand-a">
-            ${_opts(_allCands['2022'], '50110')}
-          </select>
+          <div class="ss-wrapper" id="ss-cand-a">
+            <input type="text" class="filter-select filter-select--cand ss-input" placeholder="Buscar candidato…" autocomplete="off" spellcheck="false">
+            <div class="ss-dropdown"></div>
+          </div>
         </div>
       </div>
       <div class="filter-sep">vs</div>
@@ -127,19 +214,32 @@ const OnePage = (() => {
             <option value="2022">2022 · Dep. Estadual</option>
             <option value="2024" selected>2024 · Vereador</option>
           </select>
-          <select class="filter-select filter-select--cand" id="f-cand-b">
-            <option value="">— nenhum —</option>
-            ${_opts(_allCands['2024'], '50019')}
-          </select>
+          <div class="ss-wrapper" id="ss-cand-b">
+            <input type="text" class="filter-select filter-select--cand ss-input" placeholder="Buscar candidato…" autocomplete="off" spellcheck="false">
+            <div class="ss-dropdown"></div>
+          </div>
         </div>
       </div>
     `;
+
+    _updateCandA = _searchSelect('ss-cand-a', _allCands['2022'], '50110', false, nr => {
+      const c = (_allCands[_st.yearA] || []).find(x => String(x.nr_candidato) === nr);
+      _st.candA = c ? _toCand(c) : null;
+      _onChange();
+    });
+
+    _updateCandB = _searchSelect('ss-cand-b', _allCands['2024'], '50019', true, nr => {
+      if (!nr) { _st.candB = null; _onChange(); return; }
+      const c = (_allCands[_st.yearB] || []).find(x => String(x.nr_candidato) === nr);
+      _st.candB = c ? _toCand(c) : null;
+      _onChange();
+    });
 
     document.getElementById('f-year-a').addEventListener('change', e => {
       _st.yearA = e.target.value;
       const first = (_allCands[_st.yearA] || [])[0];
       _st.candA = first ? _toCand(first) : null;
-      document.getElementById('f-cand-a').innerHTML = _opts(_allCands[_st.yearA], _st.candA?.nr);
+      _updateCandA(_allCands[_st.yearA], _st.candA?.nr);
       _onChange();
     });
 
@@ -147,33 +247,13 @@ const OnePage = (() => {
       _st.yearB = e.target.value;
       const first = (_allCands[_st.yearB] || [])[0];
       _st.candB = first ? _toCand(first) : null;
-      document.getElementById('f-cand-b').innerHTML =
-        '<option value="">— nenhum —</option>' + _opts(_allCands[_st.yearB], _st.candB?.nr);
-      _onChange();
-    });
-
-    document.getElementById('f-cand-a').addEventListener('change', e => {
-      const c = (_allCands[_st.yearA] || []).find(x => String(x.nr_candidato) === e.target.value);
-      _st.candA = c ? _toCand(c) : null;
-      _onChange();
-    });
-
-    document.getElementById('f-cand-b').addEventListener('change', e => {
-      if (!e.target.value) { _st.candB = null; _onChange(); return; }
-      const c = (_allCands[_st.yearB] || []).find(x => String(x.nr_candidato) === e.target.value);
-      _st.candB = c ? _toCand(c) : null;
+      _updateCandB(_allCands[_st.yearB], _st.candB?.nr);
       _onChange();
     });
   }
 
   function _toCand(c) {
     return { nr: String(c.nr_candidato), nm: c.nm_candidato, partido: c.sg_partido, cargo: c.ds_cargo };
-  }
-
-  function _opts(list, selectedNr) {
-    return (list || []).map(c =>
-      `<option value="${c.nr_candidato}"${String(c.nr_candidato) === String(selectedNr) ? ' selected' : ''}>${c.nm_candidato} (${c.sg_partido})</option>`
-    ).join('');
   }
 
   async function _onChange() {
