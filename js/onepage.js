@@ -302,7 +302,7 @@ const OnePage = (() => {
     const map = L.map('op-map', { zoomControl: true }).setView([-22.9064, -47.0616], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
-      maxZoom: 18,
+      maxZoom: 19,
     }).addTo(map);
 
     setTimeout(() => map.invalidateSize(), 150);
@@ -312,41 +312,49 @@ const OnePage = (() => {
       if (!r.ok) return;
       const gj = await r.json();
 
-      const maxVotos = Math.max(...gj.features.map(f => f.properties.votos_ediane || 0), 1);
+      // Todos os locais com ao menos 1 voto da Ediane
+      const comVotos = gj.features.filter(f => (f.properties.votos_ediane || 0) >= 1);
+      if (!comVotos.length) return;
 
-      const pontos = gj.features
-        .filter(f => (f.properties.votos_ediane || 0) > 0)
-        .map(f => {
-          const [lng, lat] = f.geometry.coordinates;
-          const intensity = (f.properties.votos_ediane || 0) / maxVotos;
-          return [lat, lng, intensity];
-        });
+      const maxVotos = Math.max(...comVotos.map(f => f.properties.votos_ediane), 1);
+
+      // Heatmap
+      const pontos = comVotos.map(f => {
+        const [lng, lat] = f.geometry.coordinates;
+        return [lat, lng, (f.properties.votos_ediane) / maxVotos];
+      });
 
       L.heatLayer(pontos, {
-        radius: 35,
-        blur: 22,
-        minOpacity: 0.35,
+        radius: 30,
+        blur: 20,
+        minOpacity: 0.3,
         max: 1.0,
         gradient: { 0.2: '#6D28D9', 0.5: '#8B5CF6', 0.8: '#C4B5FD', 1.0: '#FACC15' },
       }).addTo(map);
 
-      // Círculos clicáveis nos 10 maiores locais
-      const top10 = [...gj.features]
-        .sort((a, b) => (b.properties.votos_ediane || 0) - (a.properties.votos_ediane || 0))
-        .slice(0, 10);
-
-      top10.forEach(f => {
+      // Marcadores em TODOS os locais com votos (raio proporcional)
+      comVotos.forEach(f => {
         const [lng, lat] = f.geometry.coordinates;
-        const v = f.properties.votos_ediane || 0;
+        const v = f.properties.votos_ediane;
+        const r = Math.max(4, Math.round(3 + (v / maxVotos) * 8));
         L.circleMarker([lat, lng], {
-          radius: 6,
+          radius: r,
           fillColor: '#FACC15',
-          color: '#fff',
-          weight: 1.5,
-          fillOpacity: 0.9,
-        }).bindTooltip(`<strong>${v} votos</strong><br>ZE ${f.properties.nr_zona}`, { direction: 'top' })
-          .addTo(map);
+          color: '#4C1D95',
+          weight: 1,
+          fillOpacity: 0.85,
+        }).bindTooltip(
+          `<strong>${v} votos</strong><br>ZE ${f.properties.nr_zona} · Local ${f.properties.nr_local}`,
+          { direction: 'top' }
+        ).addTo(map);
       });
+
+      // Ajusta zoom para mostrar todos os locais
+      const bounds = L.latLngBounds(comVotos.map(f => {
+        const [lng, lat] = f.geometry.coordinates;
+        return [lat, lng];
+      }));
+      map.fitBounds(bounds, { padding: [32, 32] });
 
     } catch { /* sem mapa */ }
   }

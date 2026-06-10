@@ -628,7 +628,7 @@ input[type="range"]::-webkit-slider-thumb {
 .report-topbar {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 1100;
   height: 56px;
   background: var(--nav-bg);
   display: flex;
