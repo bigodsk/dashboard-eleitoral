@@ -67,8 +67,7 @@ const OnePage = (() => {
             <div class="map-ctrl-group">
               <span class="map-ctrl-lbl">Limites</span>
               <button class="map-ctrl-btn map-ctrl-on" id="ctrl-zonas" title="Delimitar Zonas Eleitorais">Zonas</button>
-              <button class="map-ctrl-btn" id="ctrl-regioes" title="Regiões administrativas de Campinas (OSM)">Regiões</button>
-              <button class="map-ctrl-btn map-ctrl-disabled" title="Dados de bairros não disponíveis — OSM não tem divisão por bairro para Campinas">Bairros</button>
+              <button class="map-ctrl-btn" id="ctrl-regioes" title="Regiões administrativas de Campinas">Regiões</button>
             </div>
           </div>
           <div class="map-container-report" id="op-map-container">
@@ -686,7 +685,7 @@ const OnePage = (() => {
     } catch { /* sem contorno */ }
   }
 
-  // ── Zonas eleitorais (hull convexo + label) ─────────────────
+  // ── Zonas eleitorais (hull convexo + hover) ─────────────────
   async function _addZoneBoundaries() {
     try {
       const r = await fetch('data/geo/locais_votos_2022.geojson');
@@ -701,39 +700,38 @@ const OnePage = (() => {
         byZone[z].push([lng, lat]);
       });
 
+      const styleNormal = { color: '#7C3AED', weight: 1.2, dashArray: '5 4', fillColor: '#EDE9FE', fillOpacity: 0.06, opacity: 0.4 };
+      const styleHover  = { color: '#5B21B6', weight: 2,   dashArray: null,   fillColor: '#C4B5FD', fillOpacity: 0.28, opacity: 0.9 };
+
       Object.entries(byZone).forEach(([zona, pts]) => {
         const hull = _convexHull(pts);
         if (hull.length < 3) return;
-        L.polygon(hull.map(([lng, lat]) => [lat, lng]), {
-          color: '#7C3AED', weight: 1.2, dashArray: '5 4',
-          fillColor: '#EDE9FE', fillOpacity: 0.06, opacity: 0.4,
-        }).addTo(_mapZonaGroup);
-
-        const cx = hull.reduce((s, p) => s + p[0], 0) / hull.length;
-        const cy = hull.reduce((s, p) => s + p[1], 0) / hull.length;
-        L.marker([cy, cx], {
-          icon: L.divIcon({
-            html: `<span class="zone-lbl">ZE ${zona}</span>`,
-            className: '', iconSize: [50, 14], iconAnchor: [25, 7],
-          }),
-          interactive: false,
-        }).addTo(_mapZonaGroup);
+        const poly = L.polygon(hull.map(([lng, lat]) => [lat, lng]), styleNormal);
+        poly.bindTooltip(`Zona Eleitoral ${zona}`, { sticky: true, className: 'map-tooltip' });
+        poly.on('mouseover', () => poly.setStyle(styleHover));
+        poly.on('mouseout',  () => poly.setStyle(styleNormal));
+        poly.addTo(_mapZonaGroup);
       });
     } catch { /* sem zonas */ }
   }
 
-  // ── Regiões administrativas (lazy) ─────────────────────────
+  // ── Regiões administrativas (lazy + hover) ─────────────────
   async function _addRegioes() {
     try {
       const r = await fetch('data/geo/campinas_regioes.geojson');
       if (!r.ok) return;
       const gj = await r.json();
+
+      const styleNormal = { color: '#059669', weight: 1.5, dashArray: '6 3', fillColor: '#D1FAE5', fillOpacity: 0.12, opacity: 0.6 };
+      const styleHover  = { color: '#047857', weight: 2.5, dashArray: null,   fillColor: '#6EE7B7', fillOpacity: 0.30, opacity: 0.9 };
+
       L.geoJSON(gj, {
-        style: { color: '#059669', weight: 1.5, dashArray: '6 3', fillColor: '#D1FAE5', fillOpacity: 0.12, opacity: 0.6 },
+        style: styleNormal,
         onEachFeature: (feature, layer) => {
-          if (feature.properties?.name) {
-            layer.bindTooltip(feature.properties.name, { permanent: false, sticky: true, className: 'zone-lbl' });
-          }
+          const nome = feature.properties?.name || '';
+          if (nome) layer.bindTooltip(nome, { sticky: true, className: 'map-tooltip' });
+          layer.on('mouseover', () => layer.setStyle(styleHover));
+          layer.on('mouseout',  () => layer.setStyle(styleNormal));
         },
       }).addTo(_mapRegioesGroup);
     } catch { /* sem regioes */ }
