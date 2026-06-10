@@ -12,10 +12,20 @@ const OnePage = (() => {
   };
 
   let _map = null;
-  let _mapGroup  = null;  // Cand A markers
-  let _mapGroupB = null;  // Cand B markers
-  let _mapBoundaryGroup = null; // city boundary + zone polygons (static)
+  let _mapCityGroup    = null;  // contorno município (sempre visível)
+  let _mapZonaGroup    = null;  // polígonos ZE + labels (togglável)
+  let _mapRegioesGroup = null;  // regiões OSM (togglável, lazy)
+  let _mapGroup        = null;  // Cand A markers
+  let _mapGroupB       = null;  // Cand B markers
   let _allCands = {};
+
+  const _layers = {
+    candA:      true,
+    candB:      true,
+    modeUrna:   true,   // true=por urna; false=por ZE apenas
+    zePolygons: true,
+    regioes:    false,
+  };
 
   // ── render ─────────────────────────────────────────────────
   async function render(container) {
@@ -36,6 +46,30 @@ const OnePage = (() => {
           <div class="content-card-header">
             <span class="content-card-title" id="op-map-title">Distribuição de Votos</span>
             <button class="map-expand-btn" id="op-map-expand" title="Ampliar mapa">&#x2922;</button>
+          </div>
+          <div class="map-controls" id="op-map-controls">
+            <div class="map-ctrl-group">
+              <span class="map-ctrl-lbl">Candidatos</span>
+              <button class="map-ctrl-btn map-ctrl-on" id="ctrl-cand-a" title="Mostrar/ocultar Candidato A">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#7C3AED;border:1px solid #4C1D95;flex-shrink:0"></span>Cand A
+              </button>
+              <button class="map-ctrl-btn map-ctrl-on" id="ctrl-cand-b" title="Mostrar/ocultar Candidato B">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#D97706;border:1px solid #92400E;flex-shrink:0"></span>Cand B
+              </button>
+            </div>
+            <div class="map-ctrl-divider"></div>
+            <div class="map-ctrl-group">
+              <span class="map-ctrl-lbl">Detalhe</span>
+              <button class="map-ctrl-btn map-ctrl-on" id="ctrl-mode-urna" title="Pontos por local de votação">Por urna</button>
+              <button class="map-ctrl-btn" id="ctrl-mode-ze" title="Círculos por Zona Eleitoral">Por ZE</button>
+            </div>
+            <div class="map-ctrl-divider"></div>
+            <div class="map-ctrl-group">
+              <span class="map-ctrl-lbl">Limites</span>
+              <button class="map-ctrl-btn map-ctrl-on" id="ctrl-zonas" title="Delimitar Zonas Eleitorais">Zonas</button>
+              <button class="map-ctrl-btn" id="ctrl-regioes" title="Regiões administrativas de Campinas (OSM)">Regiões</button>
+              <button class="map-ctrl-btn map-ctrl-disabled" title="Dados de bairros não disponíveis — OSM não tem divisão por bairro para Campinas">Bairros</button>
+            </div>
           </div>
           <div class="map-container-report" id="op-map-container">
             <div id="op-map"></div>
@@ -561,27 +595,83 @@ const OnePage = (() => {
       maxZoom: 19,
     }).addTo(_map);
 
-    _mapBoundaryGroup = L.layerGroup().addTo(_map); // city + zones (estático)
-    _mapGroup  = L.layerGroup().addTo(_map);        // Cand A
-    _mapGroupB = L.layerGroup().addTo(_map);        // Cand B
+    // Ordem das camadas (de baixo para cima)
+    _mapCityGroup    = L.layerGroup().addTo(_map);
+    _mapZonaGroup    = L.layerGroup().addTo(_map);
+    _mapRegioesGroup = L.layerGroup();  // não adicionado ao map ainda (off por padrão)
+    _mapGroup        = L.layerGroup().addTo(_map);
+    _mapGroupB       = L.layerGroup().addTo(_map);
 
     setTimeout(() => _map.invalidateSize(), 150);
 
-    // Botão de ampliar
-    const expandBtn = document.getElementById('op-map-expand');
-    if (expandBtn) {
-      expandBtn.addEventListener('click', () => {
-        const mc = document.getElementById('op-map-container');
-        const expanded = mc.classList.toggle('map-expanded');
-        expandBtn.innerHTML = expanded ? '&#x2715;' : '&#x2922;';
-        expandBtn.title = expanded ? 'Reduzir mapa' : 'Ampliar mapa';
-        setTimeout(() => _map.invalidateSize(), 320);
-        if (expanded) mc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      });
-    }
+    // Botão ampliar
+    document.getElementById('op-map-expand')?.addEventListener('click', () => {
+      const mc = document.getElementById('op-map-container');
+      const expanded = mc.classList.toggle('map-expanded');
+      document.getElementById('op-map-expand').innerHTML = expanded ? '&#x2715;' : '&#x2922;';
+      document.getElementById('op-map-expand').title = expanded ? 'Reduzir mapa' : 'Ampliar mapa';
+      setTimeout(() => _map.invalidateSize(), 320);
+      if (expanded) mc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
 
+    // Controles de camada
+    _buildMapControls();
+
+    // Camadas estáticas
     await Promise.all([_addCityBoundary(), _addZoneBoundaries()]);
     await _renderMapaUpdate();
+  }
+
+  // ── Controles de camada ─────────────────────────────────────
+  function _buildMapControls() {
+    // Toggle candidatos (show/hide layer group sem re-render)
+    document.getElementById('ctrl-cand-a')?.addEventListener('click', () => {
+      _layers.candA = !_layers.candA;
+      document.getElementById('ctrl-cand-a').classList.toggle('map-ctrl-on', _layers.candA);
+      _layers.candA ? _mapGroup.addTo(_map) : _map.removeLayer(_mapGroup);
+    });
+
+    document.getElementById('ctrl-cand-b')?.addEventListener('click', () => {
+      _layers.candB = !_layers.candB;
+      document.getElementById('ctrl-cand-b').classList.toggle('map-ctrl-on', _layers.candB);
+      _layers.candB ? _mapGroupB.addTo(_map) : _map.removeLayer(_mapGroupB);
+    });
+
+    // Toggle modo urna/ZE (precisa re-renderizar)
+    document.getElementById('ctrl-mode-urna')?.addEventListener('click', () => {
+      if (_layers.modeUrna) return;
+      _layers.modeUrna = true;
+      document.getElementById('ctrl-mode-urna').classList.add('map-ctrl-on');
+      document.getElementById('ctrl-mode-ze').classList.remove('map-ctrl-on');
+      _renderMapaUpdate();
+    });
+
+    document.getElementById('ctrl-mode-ze')?.addEventListener('click', () => {
+      if (!_layers.modeUrna) return;
+      _layers.modeUrna = false;
+      document.getElementById('ctrl-mode-ze').classList.add('map-ctrl-on');
+      document.getElementById('ctrl-mode-urna').classList.remove('map-ctrl-on');
+      _renderMapaUpdate();
+    });
+
+    // Toggle zonas eleitorais
+    document.getElementById('ctrl-zonas')?.addEventListener('click', () => {
+      _layers.zePolygons = !_layers.zePolygons;
+      document.getElementById('ctrl-zonas').classList.toggle('map-ctrl-on', _layers.zePolygons);
+      _layers.zePolygons ? _mapZonaGroup.addTo(_map) : _map.removeLayer(_mapZonaGroup);
+    });
+
+    // Toggle regiões (lazy-load)
+    document.getElementById('ctrl-regioes')?.addEventListener('click', async () => {
+      _layers.regioes = !_layers.regioes;
+      document.getElementById('ctrl-regioes').classList.toggle('map-ctrl-on', _layers.regioes);
+      if (_layers.regioes) {
+        if (_mapRegioesGroup.getLayers().length === 0) await _addRegioes();
+        _mapRegioesGroup.addTo(_map);
+      } else {
+        _map.removeLayer(_mapRegioesGroup);
+      }
+    });
   }
 
   // ── Contorno do município ───────────────────────────────────
@@ -592,7 +682,7 @@ const OnePage = (() => {
       const gj = await r.json();
       L.geoJSON(gj, {
         style: { color: '#7C3AED', weight: 2.5, dashArray: '8 5', fillOpacity: 0, opacity: 0.65 },
-      }).addTo(_mapBoundaryGroup);
+      }).addTo(_mapCityGroup);
     } catch { /* sem contorno */ }
   }
 
@@ -617,7 +707,7 @@ const OnePage = (() => {
         L.polygon(hull.map(([lng, lat]) => [lat, lng]), {
           color: '#7C3AED', weight: 1.2, dashArray: '5 4',
           fillColor: '#EDE9FE', fillOpacity: 0.06, opacity: 0.4,
-        }).addTo(_mapBoundaryGroup);
+        }).addTo(_mapZonaGroup);
 
         const cx = hull.reduce((s, p) => s + p[0], 0) / hull.length;
         const cy = hull.reduce((s, p) => s + p[1], 0) / hull.length;
@@ -627,9 +717,26 @@ const OnePage = (() => {
             className: '', iconSize: [50, 14], iconAnchor: [25, 7],
           }),
           interactive: false,
-        }).addTo(_mapBoundaryGroup);
+        }).addTo(_mapZonaGroup);
       });
     } catch { /* sem zonas */ }
+  }
+
+  // ── Regiões administrativas (lazy) ─────────────────────────
+  async function _addRegioes() {
+    try {
+      const r = await fetch('data/geo/campinas_regioes.geojson');
+      if (!r.ok) return;
+      const gj = await r.json();
+      L.geoJSON(gj, {
+        style: { color: '#059669', weight: 1.5, dashArray: '6 3', fillColor: '#D1FAE5', fillOpacity: 0.12, opacity: 0.6 },
+        onEachFeature: (feature, layer) => {
+          if (feature.properties?.name) {
+            layer.bindTooltip(feature.properties.name, { permanent: false, sticky: true, className: 'zone-lbl' });
+          }
+        },
+      }).addTo(_mapRegioesGroup);
+    } catch { /* sem regioes */ }
   }
 
   // ── Hull convexo (Andrew's monotone chain) ──────────────────
@@ -661,8 +768,8 @@ const OnePage = (() => {
     const a = _st.candA;
     const b = _st.candB;
 
-    const boundsA = a ? await _renderMapCand(a, _st.yearA, _mapGroup,  '#7C3AED', '#4C1D95', '#FACC15', true)  : [];
-    const boundsB = b ? await _renderMapCand(b, _st.yearB, _mapGroupB, '#D97706', '#92400E', '#FCD34D', false) : [];
+    const boundsA = a ? await _renderMapCand(a, _st.yearA, _mapGroup,  '#7C3AED', '#4C1D95', '#FACC15', _layers.modeUrna) : [];
+    const boundsB = b ? await _renderMapCand(b, _st.yearB, _mapGroupB, '#D97706', '#92400E', '#FCD34D', false)             : [];
 
     const allBounds = [...boundsA, ...boundsB];
     if (allBounds.length) _map.fitBounds(L.latLngBounds(allBounds), { padding: [36, 36] });
@@ -675,8 +782,9 @@ const OnePage = (() => {
     const bounds = [];
     const isEdiane = cand.nr === '50110' && year === '2022';
     const isThamy  = cand.nr === '50019' && year === '2024';
+    const useUrnaData = _layers.modeUrna && (isEdiane || isThamy);
 
-    if (isEdiane || isThamy) {
+    if (useUrnaData) {
       const gjFile = isEdiane ? 'data/geo/locais_votos_2022.geojson' : 'data/geo/locais_votos_2024.geojson';
       const vField  = isEdiane ? 'votos_ediane' : 'votos_thamy';
       try {

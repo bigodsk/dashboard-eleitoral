@@ -949,6 +949,74 @@ input[type="range"]::-webkit-slider-thumb {
   height: calc(100vh - 220px);
 }
 
+/* ── Controles de camada do mapa ── */
+.map-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--borda);
+  background: var(--fundo);
+  flex-wrap: wrap;
+}
+
+.map-ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.map-ctrl-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--texto-secundario);
+  padding-right: 4px;
+}
+
+.map-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--borda);
+  border-radius: 4px;
+  background: var(--fundo-card);
+  color: var(--texto-secundario);
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.map-ctrl-btn:hover:not(.map-ctrl-disabled) {
+  border-color: var(--psol-roxo);
+  color: var(--psol-roxo);
+}
+
+.map-ctrl-btn.map-ctrl-on {
+  background: var(--psol-roxo-claro);
+  border-color: var(--psol-roxo);
+  color: var(--psol-roxo);
+  font-weight: 600;
+}
+
+.map-ctrl-btn.map-ctrl-disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.map-ctrl-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--borda);
+  flex-shrink: 0;
+  margin: 0 3px;
+}
+
 /* ── Botão ampliar mapa ── */
 .map-expand-btn {
   margin-left: auto;
