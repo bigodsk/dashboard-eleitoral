@@ -1,11 +1,14 @@
 const OnePage = (() => {
 
   // ── Estado dos filtros ──────────────────────────────────────
+  const _DEFAULT_A = { year: '2022', nr: '50110' };
+  const _DEFAULT_B = { year: '2024', nr: '50019' };
+
   const _st = {
-    yearA: '2022',
-    candA: { nr: '50110', nm: 'Ediane Maria', partido: 'PSOL', cargo: 'Deputado Estadual' },
-    yearB: '2024',
-    candB: { nr: '50019', nm: 'Thamy do Mandela', partido: 'PSOL', cargo: 'Vereador' },
+    yearA: _DEFAULT_A.year,
+    candA: null,
+    yearB: _DEFAULT_B.year,
+    candB: null,
   };
 
   let _map = null;
@@ -74,6 +77,13 @@ const OnePage = (() => {
     `;
 
     await _loadAllCands();
+
+    // Deriva defaults a partir dos dados reais
+    const dA = (_allCands[_DEFAULT_A.year] || []).find(c => String(c.nr_candidato) === _DEFAULT_A.nr);
+    const dB = (_allCands[_DEFAULT_B.year] || []).find(c => String(c.nr_candidato) === _DEFAULT_B.nr);
+    _st.candA = dA ? _toCand(dA) : (_allCands[_st.yearA]?.[0] ? _toCand(_allCands[_st.yearA][0]) : null);
+    _st.candB = dB ? _toCand(dB) : null;
+
     _buildFilterBar();
     _initTooltip();
     _updateLabels();
@@ -222,13 +232,13 @@ const OnePage = (() => {
       </div>
     `;
 
-    _updateCandA = _searchSelect('ss-cand-a', _allCands['2022'], '50110', false, nr => {
+    _updateCandA = _searchSelect('ss-cand-a', _allCands[_st.yearA], _st.candA?.nr, false, nr => {
       const c = (_allCands[_st.yearA] || []).find(x => String(x.nr_candidato) === nr);
       _st.candA = c ? _toCand(c) : null;
       _onChange();
     });
 
-    _updateCandB = _searchSelect('ss-cand-b', _allCands['2024'], '50019', true, nr => {
+    _updateCandB = _searchSelect('ss-cand-b', _allCands[_st.yearB], _st.candB?.nr, true, nr => {
       if (!nr) { _st.candB = null; _onChange(); return; }
       const c = (_allCands[_st.yearB] || []).find(x => String(x.nr_candidato) === nr);
       _st.candB = c ? _toCand(c) : null;
