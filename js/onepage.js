@@ -723,8 +723,9 @@ const OnePage = (() => {
       L.geoJSON(gj, {
         style: styleNormal,
         onEachFeature: (feature, layer) => {
-          const nome = feature.properties?.name || '';
-          if (nome) layer.bindTooltip(nome, { sticky: true, className: 'map-tooltip' });
+          const p = feature.properties || {};
+          const label = p.DESCRICAO && p.REGIAO ? `${p.DESCRICAO} · ${p.REGIAO}` : (p.DESCRICAO || p.name || '');
+          if (label) layer.bindTooltip(label, { sticky: true, className: 'map-tooltip' });
           layer.on('mouseover', () => layer.setStyle(styleHover));
           layer.on('mouseout',  () => layer.setStyle(styleNormal));
         },
