@@ -39,21 +39,20 @@ const OnePage = (() => {
   // ── render ─────────────────────────────────────────────────
   async function render(container) {
     container.innerHTML = `
-      <div class="campo-bar" id="campo-bar">
-        <span class="an-controls-label">Campo progressista:</span>
-        <div class="campo-cbs" id="campo-selector-row">
-          <label class="campo-cb"><input type="checkbox" value="PT" checked> PT</label>
-          <label class="campo-cb"><input type="checkbox" value="PSOL" checked> PSOL</label>
-          <label class="campo-cb"><input type="checkbox" value="PSB" checked> PSB</label>
-          <label class="campo-cb"><input type="checkbox" value="PC DO B" checked> PC do B</label>
-          <label class="campo-cb"><input type="checkbox" value="PDT" checked> PDT</label>
-          <label class="campo-cb"><input type="checkbox" value="SOLIDARIEDADE" checked> Solidariedade</label>
-          <label class="campo-cb"><input type="checkbox" value="REDE"> Rede</label>
-          <label class="campo-cb"><input type="checkbox" value="PV"> PV</label>
-        </div>
-      </div>
-
       <div id="op-filter-bar" class="op-filter-bar">
+        <div class="campo-bar" id="campo-bar">
+          <span class="campo-bar-label">Campo progressista:</span>
+          <div class="campo-cbs" id="campo-selector-row">
+            <label class="campo-cb"><input type="checkbox" value="PT" checked> PT</label>
+            <label class="campo-cb"><input type="checkbox" value="PSOL" checked> PSOL</label>
+            <label class="campo-cb"><input type="checkbox" value="PSB" checked> PSB</label>
+            <label class="campo-cb"><input type="checkbox" value="PC DO B" checked> PC do B</label>
+            <label class="campo-cb"><input type="checkbox" value="PDT" checked> PDT</label>
+            <label class="campo-cb"><input type="checkbox" value="SOLIDARIEDADE" checked> Solidariedade</label>
+            <label class="campo-cb"><input type="checkbox" value="REDE"> Rede</label>
+            <label class="campo-cb"><input type="checkbox" value="PV"> PV</label>
+          </div>
+        </div>
         <div class="filter-loading">Carregando candidatos…</div>
       </div>
 

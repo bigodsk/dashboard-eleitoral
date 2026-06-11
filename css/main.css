@@ -1074,15 +1074,25 @@ input[type="range"]::-webkit-slider-thumb {
   border: 1.5px solid rgba(0,0,0,0.25);
 }
 
-/* ── Barra Campo Progressista (topo da página) ── */
+/* ── Campo Progressista dentro do filter-bar ── */
 .campo-bar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px 12px;
-  background: var(--nav-bg);
-  border-bottom: 1px solid rgba(255,255,255,0.07);
-  padding: 8px 28px;
+  gap: 6px 10px;
+  width: 100%;
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--borda);
+}
+.campo-bar-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--psol-roxo);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  margin-right: 2px;
 }
 
 /* ── Barra de controles da seção Análise ── */
@@ -1107,12 +1117,11 @@ input[type="range"]::-webkit-slider-thumb {
 .an-controls-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--psol-roxo-medio);
+  color: var(--psol-roxo);
   white-space: nowrap;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.campo-bar .an-controls-label { color: rgba(255,255,255,0.5); }
 .an-controls-divider {
   width: 1px;
   height: 28px;
@@ -1148,11 +1157,11 @@ input[type="range"]::-webkit-slider-thumb {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: rgba(255,255,255,0.75);
+  color: var(--texto-principal);
   cursor: pointer;
   user-select: none;
 }
-.campo-cb:hover { color: #fff; }
+.campo-cb:hover { color: var(--psol-roxo); }
 .campo-cb input[type="checkbox"] {
   accent-color: #7C3AED;
   width: 13px;
