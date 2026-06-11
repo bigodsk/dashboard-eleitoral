@@ -52,6 +52,8 @@ const OnePage = (() => {
             <label class="campo-cb"><input type="checkbox" value="SOLIDARIEDADE" checked> Solidariedade</label>
             <label class="campo-cb"><input type="checkbox" value="REDE"> Rede</label>
             <label class="campo-cb"><input type="checkbox" value="PV"> PV</label>
+            <label class="campo-cb"><input type="checkbox" value="UP"> UP</label>
+            <label class="campo-cb"><input type="checkbox" value="PSTU"> PSTU</label>
           </div>
         </div>
         <div id="op-filter-bar" class="op-filter-bar">
@@ -526,7 +528,7 @@ const OnePage = (() => {
     if (!el) return;
     el.innerHTML = `<div class="loading-overlay" style="height:80px"><div class="spinner"></div></div>`;
 
-    const TIP_CAMPO = `Soma dos votos nominais de <b>PSOL, PT, REDE, PCdoB, UP e PSTU</b> dividida pelo total de votos nominais da zona eleitoral.`;
+    const TIP_CAMPO = `% dos votos nominais dos <b>partidos marcados no filtro "Campo Progressista"</b> sobre o total de votos nominais da zona (${_st.yearA}).`;
 
     try {
       const a = _st.candA;
@@ -546,8 +548,17 @@ const OnePage = (() => {
       if (b) nomB.filter(d => String(d.nr_candidato).trim() === b.nr)
                  .forEach(d => { votosB[String(d.zona).padStart(4,'0')] = Number(d.votos)||0; });
 
+      // campo% dinâmico com os partidos selecionados
       const campoPct = {};
-      res.forEach(d => { campoPct[String(d.zona).padStart(4,'0')] = Number(d.campo_pct)||0; });
+      if (_votosPartidoZe && _votosPartidoZe[_st.yearA]) {
+        for (const [zona, zd] of Object.entries(_votosPartidoZe[_st.yearA])) {
+          const total = zd._total || 0;
+          const campo = [..._campoPartidos].reduce((s, p) => s + (zd[p] || 0), 0);
+          campoPct[String(zona).padStart(4,'0')] = total > 0 ? Math.round(campo / total * 1000) / 10 : 0;
+        }
+      } else {
+        res.forEach(d => { campoPct[String(d.zona).padStart(4,'0')] = Number(d.campo_pct)||0; });
+      }
 
       const zonas = [...new Set([
         ...Object.keys(votosA), ...Object.keys(votosB), ...Object.keys(campoPct)
@@ -717,6 +728,7 @@ const OnePage = (() => {
         if (cb.checked) _campoPartidos.add(cb.value);
         else _campoPartidos.delete(cb.value);
         _updateCampoMetric();
+        _renderZonaTable();
         _anCampoZe();
         _anPartidos();
         _anCorr();
