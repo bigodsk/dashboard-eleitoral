@@ -396,7 +396,12 @@ const OnePage = (() => {
       : 'Análise Eleitoral';
 
     const mt = document.getElementById('op-map-title');
-    if (mt) mt.textContent = `Distribuição de Votos — ${a?.nm || '—'} (${_st.yearA})`;
+    if (mt) {
+      const b = _st.candB;
+      mt.textContent = b
+        ? `Distribuição de Votos — ${a?.nm || '—'} (${_st.yearA}) · ${b.nm} (${_st.yearB})`
+        : `Distribuição de Votos — ${a?.nm || '—'} (${_st.yearA})`;
+    }
 
     const cs = document.getElementById('op-chart-sub');
     if (cs) cs.textContent = b
