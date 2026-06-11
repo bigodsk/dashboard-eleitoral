@@ -24,7 +24,7 @@ const OnePage = (() => {
   let _votosPartidoZe = null;
   let _escZeData = [];
   let _corrData  = [];
-  const _campoPartidos = new Set(['PT','PSOL','PSB','PC DO B','PDT','SOLIDARIEDADE']);
+  const _campoPartidos = new Set(['PSOL','PT','PC DO B','UP','PSTU','REDE','SOLIDARIEDADE','PV']);
 
   const _layers = {
     candA:      true,
@@ -44,16 +44,14 @@ const OnePage = (() => {
         <div class="campo-bar" id="campo-bar">
           <span class="campo-bar-label">Campo progressista:</span>
           <div class="campo-cbs" id="campo-selector-row">
-            <label class="campo-cb"><input type="checkbox" value="PT" checked> PT</label>
             <label class="campo-cb"><input type="checkbox" value="PSOL" checked> PSOL</label>
-            <label class="campo-cb"><input type="checkbox" value="PSB" checked> PSB</label>
+            <label class="campo-cb"><input type="checkbox" value="PT" checked> PT</label>
             <label class="campo-cb"><input type="checkbox" value="PC DO B" checked> PC do B</label>
-            <label class="campo-cb"><input type="checkbox" value="PDT" checked> PDT</label>
+            <label class="campo-cb"><input type="checkbox" value="UP" checked> UP</label>
+            <label class="campo-cb"><input type="checkbox" value="PSTU" checked> PSTU</label>
+            <label class="campo-cb"><input type="checkbox" value="REDE" checked> Rede</label>
             <label class="campo-cb"><input type="checkbox" value="SOLIDARIEDADE" checked> Solidariedade</label>
-            <label class="campo-cb"><input type="checkbox" value="REDE"> Rede</label>
-            <label class="campo-cb"><input type="checkbox" value="PV"> PV</label>
-            <label class="campo-cb"><input type="checkbox" value="UP"> UP</label>
-            <label class="campo-cb"><input type="checkbox" value="PSTU"> PSTU</label>
+            <label class="campo-cb"><input type="checkbox" value="PV" checked> PV</label>
           </div>
         </div>
         <div id="op-filter-bar" class="op-filter-bar">
