@@ -195,6 +195,12 @@ const OnePage = (() => {
     _initTooltip();
     _updateLabels();
 
+    // carrega votos por partido antes das métricas para campo% dinâmico
+    if (!_votosPartidoZe) {
+      _votosPartidoZe = await fetch('data/resultados/votos_partido_ze_all.json')
+        .then(r => r.json()).catch(() => null);
+    }
+
     await Promise.all([
       _renderMetrics(),
       _renderZonaTable(),
@@ -399,6 +405,25 @@ const OnePage = (() => {
   }
 
   // ── Métricas ─────────────────────────────────────────────
+  function _calcCampoPctMetric(year, totalVotos) {
+    if (!_votosPartidoZe || !totalVotos) return '—';
+    const anoData = _votosPartidoZe[String(year)] || {};
+    let campo = 0;
+    for (const zd of Object.values(anoData)) {
+      for (const p of _campoPartidos) campo += (zd[p] || 0);
+    }
+    return (campo / totalVotos * 100).toFixed(1);
+  }
+
+  function _updateCampoMetric() {
+    const el = document.getElementById('metric-campo-pct');
+    if (!el) return;
+    // obtém total de votos do data-attribute salvo no card
+    const totalVotos = Number(el.closest('.metric-card')?.dataset.totalVotos || 0);
+    if (!totalVotos) return;
+    el.textContent = _calcCampoPctMetric(_st.yearA, totalVotos) + '%';
+  }
+
   async function _renderMetrics() {
     const el = document.getElementById('op-metrics');
     if (!el) return;
@@ -415,8 +440,9 @@ const OnePage = (() => {
 
       const totalEleit = res.reduce((s, d) => s + (Number(d.eleitores_aptos)||0), 0);
       const totalVotos = res.reduce((s, d) => s + (Number(d.votos_total)||0), 0);
-      const campo = res.reduce((s, d) => s + (Number(d.votos_campo)||0), 0);
-      const campoPct = totalVotos ? (campo / totalVotos * 100).toFixed(1) : '—';
+
+      // campo% dinâmico baseado nos partidos selecionados
+      const campoPct = _calcCampoPctMetric(_st.yearA, totalVotos);
 
       const votosA = a ? nomA
         .filter(d => String(d.nr_candidato).trim() === a.nr)
@@ -435,9 +461,9 @@ const OnePage = (() => {
           <div class="metric-value">${Utils.fmt(totalEleit)}</div>
           <div class="metric-label" style="margin-top:4px">Campinas · SP</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card" data-total-votos="${totalVotos}">
           <div class="metric-label">Campo Progressista</div>
-          <div class="metric-value">${campoPct}%</div>
+          <div class="metric-value" id="metric-campo-pct">${campoPct}%</div>
           <div class="metric-label" style="margin-top:4px">votos nominais ${_st.yearA}</div>
         </div>
         <div class="metric-card">
@@ -684,6 +710,7 @@ const OnePage = (() => {
         if (cb.type !== 'checkbox') return;
         if (cb.checked) _campoPartidos.add(cb.value);
         else _campoPartidos.delete(cb.value);
+        _updateCampoMetric();
         _anCampoZe();
         _anPartidos();
         _anCorr();
