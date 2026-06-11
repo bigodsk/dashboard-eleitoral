@@ -1074,6 +1074,17 @@ input[type="range"]::-webkit-slider-thumb {
   border: 1.5px solid rgba(0,0,0,0.25);
 }
 
+/* ── Barra Campo Progressista (topo da página) ── */
+.campo-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  background: var(--nav-bg);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  padding: 8px 28px;
+}
+
 /* ── Barra de controles da seção Análise ── */
 .an-controls-bar {
   display: flex;
@@ -1096,11 +1107,12 @@ input[type="range"]::-webkit-slider-thumb {
 .an-controls-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--psol-roxo);
+  color: var(--psol-roxo-medio);
   white-space: nowrap;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.campo-bar .an-controls-label { color: rgba(255,255,255,0.5); }
 .an-controls-divider {
   width: 1px;
   height: 28px;
@@ -1136,10 +1148,11 @@ input[type="range"]::-webkit-slider-thumb {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: var(--texto-principal);
+  color: rgba(255,255,255,0.75);
   cursor: pointer;
   user-select: none;
 }
+.campo-cb:hover { color: #fff; }
 .campo-cb input[type="checkbox"] {
   accent-color: #7C3AED;
   width: 13px;
