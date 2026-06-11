@@ -24,7 +24,7 @@ const OnePage = (() => {
   let _votosPartidoZe = null;
   let _escZeData = [];
   let _corrData  = [];
-  const _campoPartidos = new Set(['PSOL','PT','PC DO B','UP','PSTU','REDE','SOLIDARIEDADE','PV']);
+  const _campoPartidos = new Set(['PSOL','PT','PC DO B','PCB','PDT','UP','PSTU','REDE','SOLIDARIEDADE','PV']);
 
   const _layers = {
     candA:      true,
@@ -47,6 +47,8 @@ const OnePage = (() => {
             <label class="campo-cb"><input type="checkbox" value="PSOL" checked> PSOL</label>
             <label class="campo-cb"><input type="checkbox" value="PT" checked> PT</label>
             <label class="campo-cb"><input type="checkbox" value="PC DO B" checked> PC do B</label>
+            <label class="campo-cb"><input type="checkbox" value="PCB" checked> PCB</label>
+            <label class="campo-cb"><input type="checkbox" value="PDT" checked> PDT</label>
             <label class="campo-cb"><input type="checkbox" value="UP" checked> UP</label>
             <label class="campo-cb"><input type="checkbox" value="PSTU" checked> PSTU</label>
             <label class="campo-cb"><input type="checkbox" value="REDE" checked> Rede</label>
