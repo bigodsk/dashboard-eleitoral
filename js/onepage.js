@@ -685,8 +685,8 @@ const OnePage = (() => {
     if (!ctx || !data.length) return;
     const zonas  = [...new Set(data.map(d => String(d.zona)))].sort((a,b) => Number(a)-Number(b));
     const labels = zonas.map(z => `ZE ${String(z).padStart(4,'0')}`);
-    const anos   = ['2018','2022','2024'];
-    const colors = ['#94A3B8','#7C3AED','#FACC15'];
+    const anos   = ['2018','2020','2022','2024'];
+    const colors = ['#94A3B8','#34D399','#7C3AED','#FACC15'];
     Charts.barGrouped(ctx, labels, anos.map((ano, i) => ({
       label: ano,
       data: zonas.map(z => { const r = data.find(d => String(d.zona)===z && String(d.ano)===ano); return r ? Number(r.campo_pct) : 0; }),
@@ -699,8 +699,8 @@ const OnePage = (() => {
     if (!ctx || !data.length) return;
     const zonas  = [...new Set(data.map(d => String(d.zona)))].sort((a,b) => Number(a)-Number(b));
     const labels = zonas.map(z => `ZE ${String(z).padStart(4,'0')}`);
-    const anos   = ['2018','2022','2024'];
-    const colors = ['#94A3B8','#7C3AED','#FACC15'];
+    const anos   = ['2018','2020','2022','2024'];
+    const colors = ['#94A3B8','#34D399','#7C3AED','#FACC15'];
     Charts.barGrouped(ctx, labels, anos.map((ano, i) => ({
       label: ano,
       data: zonas.map(z => { const r = data.find(d => String(d.zona)===z && String(d.ano)===ano); return r ? Number(r.abstencao_pct) : 0; }),
@@ -714,8 +714,8 @@ const OnePage = (() => {
     const MAIN   = ['PT','PSOL','PSB','PC DO B','PDT','SOLIDARIEDADE'];
     const rows   = data.filter(d => MAIN.includes(d.partido));
     const labels = MAIN.filter(p => rows.some(r => r.partido === p));
-    const anos   = ['2018','2022','2024'];
-    const colors = ['#94A3B8','#7C3AED','#FACC15'];
+    const anos   = ['2018','2020','2022','2024'];
+    const colors = ['#94A3B8','#34D399','#7C3AED','#FACC15'];
     Charts.barGrouped(ctx, labels, anos.map((ano, i) => ({
       label: ano,
       data: labels.map(p => { const r = rows.find(d => d.partido===p && String(d.ano)===ano); return r ? Number(r.votos) : 0; }),
