@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Pin shape -->
+  <path d="M16 2C10.477 2 6 6.477 6 12c0 7.5 10 18 10 18S26 19.5 26 12C26 6.477 21.523 2 16 2z" fill="#7C3AED"/>
+  <!-- White circle inside pin -->
+  <circle cx="16" cy="12" r="7" fill="white"/>
+  <!-- Bar chart inside circle -->
+  <rect x="10" y="14" width="2.5" height="3" rx="0.5" fill="#7C3AED"/>
+  <rect x="13.5" y="11" width="2.5" height="6" rx="0.5" fill="#7C3AED"/>
+  <rect x="17" y="9" width="2.5" height="8" rx="0.5" fill="#FACC15"/>
+</svg>
