@@ -129,37 +129,43 @@ const OnePage = (() => {
         </div>
       </div>
 
-      <div class="op-section-title" style="margin-top:8px;margin-bottom:16px">Análise do Eleitorado</div>
+      <div class="op-section-title" style="margin-top:8px;margin-bottom:12px">Análise do Eleitorado</div>
 
-      <div class="two-col" style="margin-bottom:24px">
-        <div class="content-card">
-          <div class="content-card-header"><span class="content-card-title">Faixa Etária do Eleitorado — Campinas 2024</span></div>
-          <div class="content-card-body"><div class="chart-container-tall"><canvas id="an-faixas"></canvas></div></div>
-        </div>
-        <div class="content-card">
-          <div class="content-card-header">
-            <span class="content-card-title">Escolaridade por Zona Eleitoral</span>
-            <div class="an-year-select" id="esc-ze-anos">
-              <button class="an-year-btn" data-ano="2018">2018</button>
-              <button class="an-year-btn" data-ano="2020">2020</button>
-              <button class="an-year-btn" data-ano="2022">2022</button>
-              <button class="an-year-btn an-year-btn-on" data-ano="2024">2024</button>
-            </div>
+      <div class="an-controls-bar">
+        <div class="an-controls-group">
+          <span class="an-controls-label">Ano do perfil:</span>
+          <div class="an-year-select" id="an-ano-global">
+            <button class="an-year-btn" data-ano="2018">2018</button>
+            <button class="an-year-btn" data-ano="2020">2020</button>
+            <button class="an-year-btn" data-ano="2022">2022</button>
+            <button class="an-year-btn an-year-btn-on" data-ano="2024">2024</button>
           </div>
-          <div class="content-card-body"><div class="chart-container-tall"><canvas id="an-esc-ze"></canvas></div></div>
+        </div>
+        <div class="an-controls-divider"></div>
+        <div class="an-controls-group">
+          <span class="an-controls-label">Campo progressista:</span>
+          <div class="campo-cbs" id="campo-selector-row">
+            <label class="campo-cb"><input type="checkbox" value="PT" checked> PT</label>
+            <label class="campo-cb"><input type="checkbox" value="PSOL" checked> PSOL</label>
+            <label class="campo-cb"><input type="checkbox" value="PSB" checked> PSB</label>
+            <label class="campo-cb"><input type="checkbox" value="PC DO B" checked> PC do B</label>
+            <label class="campo-cb"><input type="checkbox" value="PDT" checked> PDT</label>
+            <label class="campo-cb"><input type="checkbox" value="SOLIDARIEDADE" checked> Solidariedade</label>
+            <label class="campo-cb"><input type="checkbox" value="REDE"> Rede</label>
+            <label class="campo-cb"><input type="checkbox" value="PV"> PV</label>
+          </div>
         </div>
       </div>
 
-      <div class="campo-selector-row" id="campo-selector-row">
-        <span class="campo-sel-label">Campo Progressista:</span>
-        <label class="campo-cb"><input type="checkbox" value="PT" checked> PT</label>
-        <label class="campo-cb"><input type="checkbox" value="PSOL" checked> PSOL</label>
-        <label class="campo-cb"><input type="checkbox" value="PSB" checked> PSB</label>
-        <label class="campo-cb"><input type="checkbox" value="PC DO B" checked> PC do B</label>
-        <label class="campo-cb"><input type="checkbox" value="PDT" checked> PDT</label>
-        <label class="campo-cb"><input type="checkbox" value="SOLIDARIEDADE" checked> Solidariedade</label>
-        <label class="campo-cb"><input type="checkbox" value="REDE"> Rede</label>
-        <label class="campo-cb"><input type="checkbox" value="PV"> PV</label>
+      <div class="two-col" style="margin-bottom:24px">
+        <div class="content-card">
+          <div class="content-card-header"><span class="content-card-title">Faixa Etária do Eleitorado — Campinas</span></div>
+          <div class="content-card-body"><div class="chart-container-tall"><canvas id="an-faixas"></canvas></div></div>
+        </div>
+        <div class="content-card">
+          <div class="content-card-header"><span class="content-card-title">Escolaridade por Zona Eleitoral</span></div>
+          <div class="content-card-body"><div class="chart-container-tall"><canvas id="an-esc-ze"></canvas></div></div>
+        </div>
       </div>
 
       <div class="two-col" style="margin-bottom:24px">
@@ -657,36 +663,40 @@ const OnePage = (() => {
     Charts.horizontalBar(ctx, paired.map(p => p[0]), paired.map(p => p[1]), '#7C3AED');
   }
 
-  // ── Análise do Eleitorado (6 gráficos) ─────────────────────
+  // ── Análise do Eleitorado ───────────────────────────────────
+  let _faixasData = [];
+  let _anAnoAtivo = '2024';
+
   async function _renderAnalises() {
     try {
-      const [faixas, escZe, campoZe, abstZe, partidos, corr, votosJson] = await Promise.all([
-        Utils.loadCSV('data/resultados/faixas_etarias_2024.csv').catch(() => []),
+      const [faixas, escZe, abstZe, corr, votosJson] = await Promise.all([
+        Utils.loadCSV('data/resultados/faixas_etarias.csv').catch(() => []),
         Utils.loadCSV('data/resultados/escolaridade_ze.csv').catch(() => []),
-        Utils.loadCSV('data/resultados/campo_pct_ze_historico.csv').catch(() => []),
         Utils.loadCSV('data/resultados/abstencao_ze_historico.csv').catch(() => []),
-        Utils.loadCSV('data/resultados/campo_partidos_historico.csv').catch(() => []),
         Utils.loadCSV('data/resultados/correlacao_esc_campo.csv').catch(() => []),
         fetch('data/resultados/votos_partido_ze_all.json').then(r => r.json()).catch(() => null),
       ]);
 
-      _escZeData = escZe;
+      _faixasData = faixas;
+      _escZeData  = escZe;
       _votosPartidoZe = votosJson;
 
-      _anFaixas(faixas);
-      _anEscZe('2024');
+      _anFaixas(_anAnoAtivo);
+      _anEscZe(_anAnoAtivo);
       _anCampoZe();
       _anAbstZe(abstZe);
       _anPartidos();
       _anCorr(corr);
 
-      // Seletor de ano — escolaridade
-      document.getElementById('esc-ze-anos')?.addEventListener('click', e => {
+      // Seletor global de ano (faixas + escolaridade)
+      document.getElementById('an-ano-global')?.addEventListener('click', e => {
         const btn = e.target.closest('[data-ano]');
         if (!btn) return;
-        document.querySelectorAll('#esc-ze-anos .an-year-btn').forEach(b => b.classList.remove('an-year-btn-on'));
+        document.querySelectorAll('#an-ano-global .an-year-btn').forEach(b => b.classList.remove('an-year-btn-on'));
         btn.classList.add('an-year-btn-on');
-        _anEscZe(btn.dataset.ano);
+        _anAnoAtivo = btn.dataset.ano;
+        _anFaixas(_anAnoAtivo);
+        _anEscZe(_anAnoAtivo);
       });
 
       // Seletor de campo
@@ -702,10 +712,11 @@ const OnePage = (() => {
     } catch { /* sem dados */ }
   }
 
-  function _anFaixas(data) {
+  function _anFaixas(ano) {
     const ctx = document.getElementById('an-faixas');
-    if (!ctx || !data.length) return;
-    const rows = data.filter(d => d.faixa && !String(d.faixa).includes('nválid'));
+    if (!ctx || !_faixasData.length) return;
+    const rows = _faixasData.filter(d => String(d.ano) === String(ano));
+    if (!rows.length) return;
     Charts.horizontalBar(
       ctx,
       rows.map(d => d.faixa),
