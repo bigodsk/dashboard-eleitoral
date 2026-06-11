@@ -397,10 +397,11 @@ const OnePage = (() => {
 
     const mt = document.getElementById('op-map-title');
     if (mt) {
+      const firstName = nm => nm ? nm.split(' ')[0].charAt(0) + nm.split(' ')[0].slice(1).toLowerCase() : '—';
       const b = _st.candB;
       mt.textContent = b
-        ? `Distribuição de Votos — ${a?.nm || '—'} (${_st.yearA}) · ${b.nm} (${_st.yearB})`
-        : `Distribuição de Votos — ${a?.nm || '—'} (${_st.yearA})`;
+        ? `Distribuição de Votos — ${firstName(a?.nm)} (${_st.yearA}) · ${firstName(b.nm)} (${_st.yearB})`
+        : `Distribuição de Votos — ${firstName(a?.nm)} (${_st.yearA})`;
     }
 
     const cs = document.getElementById('op-chart-sub');
