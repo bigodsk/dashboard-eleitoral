@@ -21,6 +21,9 @@ const OnePage = (() => {
   let _mapGroup        = null;
   let _mapGroupB       = null;
   let _allCands = {};
+  let _votosPartidoZe = null;
+  let _escZeData = [];
+  const _campoPartidos = new Set(['PT','PSOL','PSB','PC DO B','PDT','SOLIDARIEDADE']);
 
   const _layers = {
     candA:      true,
@@ -134,25 +137,45 @@ const OnePage = (() => {
           <div class="content-card-body"><div class="chart-container-tall"><canvas id="an-faixas"></canvas></div></div>
         </div>
         <div class="content-card">
-          <div class="content-card-header"><span class="content-card-title">Escolaridade por Zona Eleitoral (2024)</span></div>
+          <div class="content-card-header">
+            <span class="content-card-title">Escolaridade por Zona Eleitoral</span>
+            <div class="an-year-select" id="esc-ze-anos">
+              <button class="an-year-btn" data-ano="2018">2018</button>
+              <button class="an-year-btn" data-ano="2020">2020</button>
+              <button class="an-year-btn" data-ano="2022">2022</button>
+              <button class="an-year-btn an-year-btn-on" data-ano="2024">2024</button>
+            </div>
+          </div>
           <div class="content-card-body"><div class="chart-container-tall"><canvas id="an-esc-ze"></canvas></div></div>
         </div>
       </div>
 
+      <div class="campo-selector-row" id="campo-selector-row">
+        <span class="campo-sel-label">Campo Progressista:</span>
+        <label class="campo-cb"><input type="checkbox" value="PT" checked> PT</label>
+        <label class="campo-cb"><input type="checkbox" value="PSOL" checked> PSOL</label>
+        <label class="campo-cb"><input type="checkbox" value="PSB" checked> PSB</label>
+        <label class="campo-cb"><input type="checkbox" value="PC DO B" checked> PC do B</label>
+        <label class="campo-cb"><input type="checkbox" value="PDT" checked> PDT</label>
+        <label class="campo-cb"><input type="checkbox" value="SOLIDARIEDADE" checked> Solidariedade</label>
+        <label class="campo-cb"><input type="checkbox" value="REDE"> Rede</label>
+        <label class="campo-cb"><input type="checkbox" value="PV"> PV</label>
+      </div>
+
       <div class="two-col" style="margin-bottom:24px">
         <div class="content-card">
-          <div class="content-card-header"><span class="content-card-title">% Campo Progressista por ZE — 2018 · 2022 · 2024</span></div>
+          <div class="content-card-header"><span class="content-card-title">% Campo Progressista por ZE — 2018 · 2020 · 2022 · 2024</span></div>
           <div class="content-card-body"><div class="chart-container"><canvas id="an-campo-ze"></canvas></div></div>
         </div>
         <div class="content-card">
-          <div class="content-card-header"><span class="content-card-title">Abstenção por Zona Eleitoral — 2018 · 2022 · 2024</span></div>
+          <div class="content-card-header"><span class="content-card-title">Abstenção por Zona Eleitoral — 2018 · 2020 · 2022 · 2024</span></div>
           <div class="content-card-body"><div class="chart-container"><canvas id="an-abst-ze"></canvas></div></div>
         </div>
       </div>
 
       <div class="two-col" style="margin-bottom:24px">
         <div class="content-card">
-          <div class="content-card-header"><span class="content-card-title">Partidos do Campo — Votos 2018 · 2022 · 2024</span></div>
+          <div class="content-card-header"><span class="content-card-title">Partidos do Campo — Votos 2018 · 2020 · 2022 · 2024</span></div>
           <div class="content-card-body"><div class="chart-container"><canvas id="an-campo-partidos"></canvas></div></div>
         </div>
         <div class="content-card">
@@ -637,20 +660,45 @@ const OnePage = (() => {
   // ── Análise do Eleitorado (6 gráficos) ─────────────────────
   async function _renderAnalises() {
     try {
-      const [faixas, escZe, campoZe, abstZe, partidos, corr] = await Promise.all([
+      const [faixas, escZe, campoZe, abstZe, partidos, corr, votosJson] = await Promise.all([
         Utils.loadCSV('data/resultados/faixas_etarias_2024.csv').catch(() => []),
         Utils.loadCSV('data/resultados/escolaridade_ze.csv').catch(() => []),
         Utils.loadCSV('data/resultados/campo_pct_ze_historico.csv').catch(() => []),
         Utils.loadCSV('data/resultados/abstencao_ze_historico.csv').catch(() => []),
         Utils.loadCSV('data/resultados/campo_partidos_historico.csv').catch(() => []),
         Utils.loadCSV('data/resultados/correlacao_esc_campo.csv').catch(() => []),
+        fetch('data/resultados/votos_partido_ze_all.json').then(r => r.json()).catch(() => null),
       ]);
+
+      _escZeData = escZe;
+      _votosPartidoZe = votosJson;
+
       _anFaixas(faixas);
-      _anEscZe(escZe);
-      _anCampoZe(campoZe);
+      _anEscZe('2024');
+      _anCampoZe();
       _anAbstZe(abstZe);
-      _anPartidos(partidos);
+      _anPartidos();
       _anCorr(corr);
+
+      // Seletor de ano — escolaridade
+      document.getElementById('esc-ze-anos')?.addEventListener('click', e => {
+        const btn = e.target.closest('[data-ano]');
+        if (!btn) return;
+        document.querySelectorAll('#esc-ze-anos .an-year-btn').forEach(b => b.classList.remove('an-year-btn-on'));
+        btn.classList.add('an-year-btn-on');
+        _anEscZe(btn.dataset.ano);
+      });
+
+      // Seletor de campo
+      document.getElementById('campo-selector-row')?.addEventListener('change', e => {
+        const cb = e.target;
+        if (cb.type !== 'checkbox') return;
+        if (cb.checked) _campoPartidos.add(cb.value);
+        else _campoPartidos.delete(cb.value);
+        _anCampoZe();
+        _anPartidos();
+      });
+
     } catch { /* sem dados */ }
   }
 
@@ -667,29 +715,42 @@ const OnePage = (() => {
     );
   }
 
-  function _anEscZe(data) {
+  function _anEscZe(ano) {
     const ctx = document.getElementById('an-esc-ze');
-    if (!ctx || !data.length) return;
-    const cols   = Object.keys(data[0]).filter(k => k !== 'zona');
-    const labels = data.map(d => `ZE ${String(d.zona).padStart(4,'0')}`);
+    if (!ctx || !_escZeData.length) return;
+    const filtered = _escZeData.filter(d => String(d.ano) === String(ano));
+    if (!filtered.length) return;
+    const cols   = Object.keys(filtered[0]).filter(k => k !== 'zona' && k !== 'ano');
+    const labels = filtered.map(d => `ZE ${String(d.zona).padStart(4,'0')}`);
     const palette = ['#991B1B','#DC2626','#D97706','#F59E0B','#FACC15','#3B82F6','#7C3AED','#4C1D95'];
     Charts.barStacked(ctx, labels, cols.map((col, i) => ({
       label: col,
-      data: data.map(d => Number(d[col]) || 0),
+      data: filtered.map(d => Number(d[col]) || 0),
       color: palette[i % palette.length],
     })), { pct: true, max: 100 });
   }
 
-  function _anCampoZe(data) {
+  function _anCampoZe() {
     const ctx = document.getElementById('an-campo-ze');
-    if (!ctx || !data.length) return;
-    const zonas  = [...new Set(data.map(d => String(d.zona)))].sort((a,b) => Number(a)-Number(b));
-    const labels = zonas.map(z => `ZE ${String(z).padStart(4,'0')}`);
-    const anos   = ['2018','2020','2022','2024'];
+    if (!ctx) return;
+    const ANOS = ['2018','2020','2022','2024'];
     const colors = ['#94A3B8','#34D399','#7C3AED','#FACC15'];
-    Charts.barGrouped(ctx, labels, anos.map((ano, i) => ({
+    let zonas, calcPct;
+    if (_votosPartidoZe) {
+      zonas = Object.keys(_votosPartidoZe['2024'] || {}).sort((a,b) => Number(a)-Number(b));
+      calcPct = (zona, ano) => {
+        const zd = (_votosPartidoZe[ano] || {})[zona] || {};
+        const total = zd._total || 0;
+        const campo = [..._campoPartidos].reduce((s, p) => s + (zd[p] || 0), 0);
+        return total > 0 ? Math.round(campo / total * 1000) / 10 : 0;
+      };
+    } else {
+      return;
+    }
+    const labels = zonas.map(z => `ZE ${String(z).padStart(4,'0')}`);
+    Charts.barGrouped(ctx, labels, ANOS.map((ano, i) => ({
       label: ano,
-      data: zonas.map(z => { const r = data.find(d => String(d.zona)===z && String(d.ano)===ano); return r ? Number(r.campo_pct) : 0; }),
+      data: zonas.map(z => calcPct(z, ano)),
       color: colors[i],
     })), { pct: true });
   }
@@ -708,17 +769,19 @@ const OnePage = (() => {
     })), { pct: true });
   }
 
-  function _anPartidos(data) {
+  function _anPartidos() {
     const ctx = document.getElementById('an-campo-partidos');
-    if (!ctx || !data.length) return;
-    const MAIN   = ['PT','PSOL','PSB','PC DO B','PDT','SOLIDARIEDADE'];
-    const rows   = data.filter(d => MAIN.includes(d.partido));
-    const labels = MAIN.filter(p => rows.some(r => r.partido === p));
-    const anos   = ['2018','2020','2022','2024'];
+    if (!ctx || !_votosPartidoZe) return;
+    const ANOS   = ['2018','2020','2022','2024'];
     const colors = ['#94A3B8','#34D399','#7C3AED','#FACC15'];
-    Charts.barGrouped(ctx, labels, anos.map((ano, i) => ({
+    const labels = [..._campoPartidos];
+    const getVotos = (partido, ano) => {
+      const anoData = _votosPartidoZe[ano] || {};
+      return Object.values(anoData).reduce((s, zd) => s + (zd[partido] || 0), 0);
+    };
+    Charts.barGrouped(ctx, labels, ANOS.map((ano, i) => ({
       label: ano,
-      data: labels.map(p => { const r = rows.find(d => d.partido===p && String(d.ano)===ano); return r ? Number(r.votos) : 0; }),
+      data: labels.map(p => getVotos(p, ano)),
       color: colors[i],
     })));
   }
