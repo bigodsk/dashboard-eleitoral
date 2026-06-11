@@ -301,13 +301,25 @@ const OnePage = (() => {
   }
 
   // ── Candidatos ─────────────────────────────────────────────
+  const _YEAR_LABEL = {
+    '2018': '2018 · Dep. Estadual',
+    '2020': '2020 · Vereador',
+    '2022': '2022 · Dep. Estadual',
+    '2024': '2024 · Vereador',
+  };
+
   async function _loadAllCands() {
-    const [c22, c24] = await Promise.all([
+    const [c18, c20, c22, c24] = await Promise.all([
+      Utils.loadCSV('data/resultados/candidatos_campinas_2018.csv').catch(() => []),
+      Utils.loadCSV('data/resultados/candidatos_campinas_2020.csv').catch(() => []),
       Utils.loadCSV('data/resultados/candidatos_campinas_2022.csv').catch(() => []),
       Utils.loadCSV('data/resultados/candidatos_campinas_2024.csv').catch(() => []),
     ]);
-    _allCands['2022'] = c22.sort((a, b) => (Number(b.total_votos)||0) - (Number(a.total_votos)||0));
-    _allCands['2024'] = c24.sort((a, b) => (Number(b.total_votos)||0) - (Number(a.total_votos)||0));
+    const srt = arr => arr.sort((a, b) => (Number(b.total_votos)||0) - (Number(a.total_votos)||0));
+    _allCands['2018'] = srt(c18);
+    _allCands['2020'] = srt(c20);
+    _allCands['2022'] = srt(c22);
+    _allCands['2024'] = srt(c24);
   }
 
   // ── Barra de filtros ────────────────────────────────────────
@@ -323,6 +335,8 @@ const OnePage = (() => {
         <span class="filter-label">Candidato A — Foco</span>
         <div class="filter-row">
           <select class="filter-select filter-select--year" id="f-year-a">
+            <option value="2018">2018 · Dep. Estadual</option>
+            <option value="2020">2020 · Vereador</option>
             <option value="2022" selected>2022 · Dep. Estadual</option>
             <option value="2024">2024 · Vereador</option>
           </select>
@@ -337,6 +351,8 @@ const OnePage = (() => {
         <span class="filter-label">Candidato B — Comparação</span>
         <div class="filter-row">
           <select class="filter-select filter-select--year" id="f-year-b">
+            <option value="2018">2018 · Dep. Estadual</option>
+            <option value="2020">2020 · Vereador</option>
             <option value="2022">2022 · Dep. Estadual</option>
             <option value="2024" selected>2024 · Vereador</option>
           </select>
