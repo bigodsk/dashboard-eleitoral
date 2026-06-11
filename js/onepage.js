@@ -792,7 +792,7 @@ const OnePage = (() => {
     };
 
     const points = _corrData.map(d => {
-      const campoPct = calcCampoPct(d.zona) ?? Number(d['Campo Pct']) || 0;
+      const campoPct = calcCampoPct(d.zona) !== null ? calcCampoPct(d.zona) : (Number(d['Campo Pct']) || 0);
       return {
         x: Number(d['Superior Completo']) || 0,
         y: campoPct,
