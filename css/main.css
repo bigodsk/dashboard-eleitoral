@@ -1093,12 +1093,77 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* ── Responsividade ── */
-@media (max-width: 960px) {
-  .sidebar { width: 60px; }
-  .sidebar-logo-title, .sidebar-logo-sub, .sidebar-logo-badge, .nav-item span:not(.nav-icon) { display: none; }
-  .nav-item { justify-content: center; padding: 10px; }
-  .two-col, .three-col, .op-map-layout { grid-template-columns: 1fr; }
-  .ze-layout { grid-template-columns: 1fr; }
-  .report-main { padding: 16px; }
-  .topbar-candidate { display: none; }
+
+/* Tablet (≤ 768px) */
+@media (max-width: 768px) {
+  .two-col,
+  .three-col,
+  .op-map-layout,
+  .ze-layout            { grid-template-columns: 1fr; }
+
+  .report-main          { padding: 16px 16px 40px; }
+  .report-topbar        { padding: 0 16px; }
+
+  .metrics-grid--center {
+    grid-template-columns: repeat(2, 1fr);
+    justify-content: stretch;
+  }
+
+  .content-card-header  { padding: 12px 16px; }
+  .content-card-body    { padding: 14px 16px; }
+}
+
+/* Mobile (≤ 600px) */
+@media (max-width: 600px) {
+  .report-topbar        { padding: 0 12px; gap: 10px; }
+  .topbar-sep,
+  .topbar-sub           { display: none; }
+
+  .report-main          { padding: 10px 10px 32px; }
+
+  /* Filtros: empilha A e B verticalmente */
+  .op-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    gap: 10px;
+  }
+  .filter-group         { width: 100%; min-width: 0; flex: none; }
+  .filter-sep           { display: none; }
+  .filter-row           { flex-wrap: wrap; }
+  .filter-select--year  { min-width: 90px; }
+  .ss-wrapper           { min-width: 0; flex: 1; }
+  .ss-dropdown          { max-height: 160px; }
+
+  /* Mapa */
+  .map-container-report              { height: 260px; }
+  .map-container-report.map-expanded { height: calc(100vh - 140px); }
+  .map-controls         { padding: 5px 8px; gap: 3px; }
+  .map-ctrl-divider     { display: none; }
+  .map-ctrl-btn         { font-size: 10px; padding: 3px 7px; }
+
+  /* Cards */
+  .content-card-header  { padding: 10px 12px; }
+  .content-card-body    { padding: 12px; }
+  .content-card-title   { font-size: 13px; }
+
+  /* Tabela prioridade — scroll horizontal */
+  #op-prioridade        { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Métricas */
+  .metrics-grid         { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .metrics-grid--center {
+    grid-template-columns: repeat(2, 1fr);
+    justify-content: stretch;
+  }
+}
+
+/* Mobile pequeno (≤ 400px) */
+@media (max-width: 400px) {
+  .report-topbar        { height: 46px; }
+  .topbar-title         { font-size: 12px; }
+  .map-container-report { height: 220px; }
+  .map-ctrl-lbl         { display: none; }
+  .filter-select--year  { min-width: 80px; font-size: 12px; }
+  .content-card-body    { padding: 10px; }
 }
