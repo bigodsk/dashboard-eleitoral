@@ -116,12 +116,19 @@ const Charts = (() => {
         maintainAspectRatio: false,
         plugins: {
           legend: { position: 'top', labels: { boxWidth: 12, padding: 16 } },
-          tooltip: { mode: 'index', intersect: false },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            callbacks: {
+              label: c => options.pct ? ` ${c.dataset.label}: ${c.raw}%` : ` ${c.dataset.label}: ${c.raw}`,
+            },
+          },
         },
         scales: {
           x: { stacked: true, grid: { display: false } },
           y: {
             stacked: true,
+            max: options.max ?? undefined,
             grid: { color: DEFAULTS.gridColor },
             ticks: { callback: v => options.pct ? v + '%' : v },
           },

@@ -134,7 +134,7 @@ const OnePage = (() => {
           <div class="content-card-body"><div class="chart-container-tall"><canvas id="an-faixas"></canvas></div></div>
         </div>
         <div class="content-card">
-          <div class="content-card-header"><span class="content-card-title">Escolaridade por Zona Eleitoral</span></div>
+          <div class="content-card-header"><span class="content-card-title">Escolaridade por Zona Eleitoral (2024)</span></div>
           <div class="content-card-body"><div class="chart-container-tall"><canvas id="an-esc-ze"></canvas></div></div>
         </div>
       </div>
@@ -677,7 +677,7 @@ const OnePage = (() => {
       label: col,
       data: data.map(d => Number(d[col]) || 0),
       color: palette[i % palette.length],
-    })), { pct: true });
+    })), { pct: true, max: 100 });
   }
 
   function _anCampoZe(data) {
