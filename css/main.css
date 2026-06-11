@@ -1074,16 +1074,30 @@ input[type="range"]::-webkit-slider-thumb {
   border: 1.5px solid rgba(0,0,0,0.25);
 }
 
-/* ── Campo Progressista dentro do filter-bar ── */
+/* ── Wrapper que agrupa campo-bar + filter-bar num único card ── */
+.op-filter-wrap {
+  background: var(--fundo-card);
+  border: 1px solid var(--borda);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--sombra);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.op-filter-wrap .op-filter-bar {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin-bottom: 0;
+  border-top: 1px solid var(--borda);
+}
+
+/* ── Campo Progressista ── */
 .campo-bar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px 10px;
-  width: 100%;
-  padding-bottom: 10px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid var(--borda);
+  padding: 9px 20px;
 }
 .campo-bar-label {
   font-size: 10px;

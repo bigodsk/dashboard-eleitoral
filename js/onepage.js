@@ -40,7 +40,7 @@ const OnePage = (() => {
   // ── render ─────────────────────────────────────────────────
   async function render(container) {
     container.innerHTML = `
-      <div id="op-filter-bar" class="op-filter-bar">
+      <div class="op-filter-wrap">
         <div class="campo-bar" id="campo-bar">
           <span class="campo-bar-label">Campo progressista:</span>
           <div class="campo-cbs" id="campo-selector-row">
@@ -54,7 +54,9 @@ const OnePage = (() => {
             <label class="campo-cb"><input type="checkbox" value="PV"> PV</label>
           </div>
         </div>
-        <div class="filter-loading">Carregando candidatos…</div>
+        <div id="op-filter-bar" class="op-filter-bar">
+          <div class="filter-loading">Carregando candidatos…</div>
+        </div>
       </div>
 
       <div class="op-section-title" id="op-section-title">Análise Eleitoral</div>
