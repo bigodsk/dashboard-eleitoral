@@ -159,7 +159,7 @@ const Charts = (() => {
     return chart;
   }
 
-  function horizontalBar(ctx, labels, data, color) {
+  function horizontalBar(ctx, labels, data, color, options = {}) {
     destroy(ctx.id || ctx.canvas?.id);
     const chart = new Chart(ctx, {
       type: 'bar',
@@ -171,16 +171,40 @@ const Charts = (() => {
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => options.fmt ? ` ${options.fmt(c.raw)}` : ` ${c.raw}%` } } },
         scales: {
-          x: { grid: { color: DEFAULTS.gridColor }, ticks: { callback: v => v + '%' } },
-          y: { grid: { display: false } },
+          x: { grid: { color: DEFAULTS.gridColor }, ticks: { callback: v => options.fmt ? options.fmt(v) : v + '%' } },
+          y: { grid: { display: false }, ticks: { font: { size: 10 } } },
         },
+        ...options.chartOptions,
       },
     });
     if (ctx.id) _instances[ctx.id] = chart;
     return chart;
   }
 
-  return { lineSerie, barGrouped, barStacked, doughnut, horizontalBar, destroy };
+  function scatter(ctx, datasets, options = {}) {
+    destroy(ctx.id || ctx.canvas?.id);
+    const chart = new Chart(ctx, {
+      type: 'scatter',
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: datasets.length > 1 },
+          tooltip: { callbacks: { label: c => options.tooltipFn ? options.tooltipFn(c.raw) : `(${c.raw.x}, ${c.raw.y})` } },
+        },
+        scales: {
+          x: { grid: { color: DEFAULTS.gridColor }, title: { display: !!options.xLabel, text: options.xLabel || '' }, ticks: { callback: v => options.pct ? v + '%' : v } },
+          y: { grid: { color: DEFAULTS.gridColor }, title: { display: !!options.yLabel, text: options.yLabel || '' }, ticks: { callback: v => options.pct ? v + '%' : v } },
+        },
+        ...options.chartOptions,
+      },
+    });
+    if (ctx.id) _instances[ctx.id] = chart;
+    return chart;
+  }
+
+  return { lineSerie, barGrouped, barStacked, doughnut, horizontalBar, scatter, destroy };
 })();

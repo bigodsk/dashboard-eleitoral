@@ -125,6 +125,43 @@ const OnePage = (() => {
           <div class="content-card-body"><div class="chart-container"><canvas id="op-chart-esc"></canvas></div></div>
         </div>
       </div>
+
+      <div class="op-section-title" style="margin-top:8px;margin-bottom:16px">Análise do Eleitorado</div>
+
+      <div class="two-col" style="margin-bottom:24px">
+        <div class="content-card">
+          <div class="content-card-header"><span class="content-card-title">Faixa Etária do Eleitorado — Campinas 2024</span></div>
+          <div class="content-card-body"><div class="chart-container-tall"><canvas id="an-faixas"></canvas></div></div>
+        </div>
+        <div class="content-card">
+          <div class="content-card-header"><span class="content-card-title">Escolaridade por Zona Eleitoral</span></div>
+          <div class="content-card-body"><div class="chart-container-tall"><canvas id="an-esc-ze"></canvas></div></div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-bottom:24px">
+        <div class="content-card">
+          <div class="content-card-header"><span class="content-card-title">% Campo Progressista por ZE — 2018 · 2022 · 2024</span></div>
+          <div class="content-card-body"><div class="chart-container"><canvas id="an-campo-ze"></canvas></div></div>
+        </div>
+        <div class="content-card">
+          <div class="content-card-header"><span class="content-card-title">Abstenção por Zona Eleitoral — 2018 · 2022 · 2024</span></div>
+          <div class="content-card-body"><div class="chart-container"><canvas id="an-abst-ze"></canvas></div></div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-bottom:24px">
+        <div class="content-card">
+          <div class="content-card-header"><span class="content-card-title">Partidos do Campo — Votos 2018 · 2022 · 2024</span></div>
+          <div class="content-card-body"><div class="chart-container"><canvas id="an-campo-partidos"></canvas></div></div>
+        </div>
+        <div class="content-card">
+          <div class="content-card-header">
+            <span class="content-card-title">Escolaridade Superior × % Campo por ZE</span>
+          </div>
+          <div class="content-card-body"><div class="chart-container"><canvas id="an-corr"></canvas></div></div>
+        </div>
+      </div>
     `;
 
     await _loadAllCands();
@@ -144,6 +181,7 @@ const OnePage = (() => {
       _renderZonaTable(),
       _renderZonasChart(),
       _renderPerfil(),
+      _renderAnalises(),
     ]);
 
     _renderMapa();
@@ -594,6 +632,116 @@ const OnePage = (() => {
     );
     const paired = labels.map((l, i) => [l, values[i]]).sort((a, b) => b[1] - a[1]);
     Charts.horizontalBar(ctx, paired.map(p => p[0]), paired.map(p => p[1]), '#7C3AED');
+  }
+
+  // ── Análise do Eleitorado (6 gráficos) ─────────────────────
+  async function _renderAnalises() {
+    try {
+      const [faixas, escZe, campoZe, abstZe, partidos, corr] = await Promise.all([
+        Utils.loadCSV('data/resultados/faixas_etarias_2024.csv').catch(() => []),
+        Utils.loadCSV('data/resultados/escolaridade_ze.csv').catch(() => []),
+        Utils.loadCSV('data/resultados/campo_pct_ze_historico.csv').catch(() => []),
+        Utils.loadCSV('data/resultados/abstencao_ze_historico.csv').catch(() => []),
+        Utils.loadCSV('data/resultados/campo_partidos_historico.csv').catch(() => []),
+        Utils.loadCSV('data/resultados/correlacao_esc_campo.csv').catch(() => []),
+      ]);
+      _anFaixas(faixas);
+      _anEscZe(escZe);
+      _anCampoZe(campoZe);
+      _anAbstZe(abstZe);
+      _anPartidos(partidos);
+      _anCorr(corr);
+    } catch { /* sem dados */ }
+  }
+
+  function _anFaixas(data) {
+    const ctx = document.getElementById('an-faixas');
+    if (!ctx || !data.length) return;
+    const rows = data.filter(d => d.faixa && !String(d.faixa).includes('nválid'));
+    Charts.horizontalBar(
+      ctx,
+      rows.map(d => d.faixa),
+      rows.map(d => Number(d.eleitores) || 0),
+      '#7C3AED',
+      { fmt: v => Utils.fmt(v), chartOptions: { plugins: { legend: { display: false } } } }
+    );
+  }
+
+  function _anEscZe(data) {
+    const ctx = document.getElementById('an-esc-ze');
+    if (!ctx || !data.length) return;
+    const cols   = Object.keys(data[0]).filter(k => k !== 'zona');
+    const labels = data.map(d => `ZE ${String(d.zona).padStart(4,'0')}`);
+    const palette = ['#991B1B','#DC2626','#D97706','#F59E0B','#FACC15','#3B82F6','#7C3AED','#4C1D95'];
+    Charts.barStacked(ctx, labels, cols.map((col, i) => ({
+      label: col,
+      data: data.map(d => Number(d[col]) || 0),
+      color: palette[i % palette.length],
+    })), { pct: true });
+  }
+
+  function _anCampoZe(data) {
+    const ctx = document.getElementById('an-campo-ze');
+    if (!ctx || !data.length) return;
+    const zonas  = [...new Set(data.map(d => String(d.zona)))].sort((a,b) => Number(a)-Number(b));
+    const labels = zonas.map(z => `ZE ${String(z).padStart(4,'0')}`);
+    const anos   = ['2018','2022','2024'];
+    const colors = ['#94A3B8','#7C3AED','#FACC15'];
+    Charts.barGrouped(ctx, labels, anos.map((ano, i) => ({
+      label: ano,
+      data: zonas.map(z => { const r = data.find(d => String(d.zona)===z && String(d.ano)===ano); return r ? Number(r.campo_pct) : 0; }),
+      color: colors[i],
+    })), { pct: true });
+  }
+
+  function _anAbstZe(data) {
+    const ctx = document.getElementById('an-abst-ze');
+    if (!ctx || !data.length) return;
+    const zonas  = [...new Set(data.map(d => String(d.zona)))].sort((a,b) => Number(a)-Number(b));
+    const labels = zonas.map(z => `ZE ${String(z).padStart(4,'0')}`);
+    const anos   = ['2018','2022','2024'];
+    const colors = ['#94A3B8','#7C3AED','#FACC15'];
+    Charts.barGrouped(ctx, labels, anos.map((ano, i) => ({
+      label: ano,
+      data: zonas.map(z => { const r = data.find(d => String(d.zona)===z && String(d.ano)===ano); return r ? Number(r.abstencao_pct) : 0; }),
+      color: colors[i],
+    })), { pct: true });
+  }
+
+  function _anPartidos(data) {
+    const ctx = document.getElementById('an-campo-partidos');
+    if (!ctx || !data.length) return;
+    const MAIN   = ['PT','PSOL','PSB','PC DO B','PDT','SOLIDARIEDADE'];
+    const rows   = data.filter(d => MAIN.includes(d.partido));
+    const labels = MAIN.filter(p => rows.some(r => r.partido === p));
+    const anos   = ['2018','2022','2024'];
+    const colors = ['#94A3B8','#7C3AED','#FACC15'];
+    Charts.barGrouped(ctx, labels, anos.map((ano, i) => ({
+      label: ano,
+      data: labels.map(p => { const r = rows.find(d => d.partido===p && String(d.ano)===ano); return r ? Number(r.votos) : 0; }),
+      color: colors[i],
+    })));
+  }
+
+  function _anCorr(data) {
+    const ctx = document.getElementById('an-corr');
+    if (!ctx || !data.length) return;
+    Charts.scatter(ctx, [{
+      label: 'ZE',
+      data: data.map(d => ({
+        x: Number(d['Superior Completo']) || 0,
+        y: Number(d['Campo Pct'])         || 0,
+        zona: String(d.zona).padStart(4,'0'),
+      })),
+      backgroundColor: '#7C3AED',
+      pointRadius: 9,
+      pointHoverRadius: 11,
+    }], {
+      pct: true,
+      xLabel: '% Superior Completo',
+      yLabel: '% Campo',
+      tooltipFn: r => `ZE ${r.zona} — ${r.y.toFixed(1)}% campo · ${r.x.toFixed(1)}% superior`,
+    });
   }
 
   // ── Mapa — inicialização ────────────────────────────────────
