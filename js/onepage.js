@@ -23,6 +23,7 @@ const OnePage = (() => {
   let _allCands = {};
   let _votosPartidoZe = null;
   let _escZeData = [];
+  let _corrData  = [];
   const _campoPartidos = new Set(['PT','PSOL','PSB','PC DO B','PDT','SOLIDARIEDADE']);
 
   const _layers = {
@@ -663,8 +664,9 @@ const OnePage = (() => {
         fetch('data/resultados/votos_partido_ze_all.json').then(r => r.json()).catch(() => null),
       ]);
 
-      _faixasData = faixas;
-      _escZeData  = escZe;
+      _faixasData     = faixas;
+      _escZeData      = escZe;
+      _corrData       = corr;
       _votosPartidoZe = votosJson;
 
       _anFaixas('2024');
@@ -672,9 +674,9 @@ const OnePage = (() => {
       _anCampoZe();
       _anAbstZe(abstZe);
       _anPartidos();
-      _anCorr(corr);
+      _anCorr();
 
-      // Seletor de campo (agora no topo da página)
+      // Seletor de campo (topo da página)
       document.getElementById('campo-selector-row')?.addEventListener('change', e => {
         const cb = e.target;
         if (cb.type !== 'checkbox') return;
@@ -682,6 +684,7 @@ const OnePage = (() => {
         else _campoPartidos.delete(cb.value);
         _anCampoZe();
         _anPartidos();
+        _anCorr();
       });
 
     } catch { /* sem dados */ }
@@ -772,23 +775,39 @@ const OnePage = (() => {
     })));
   }
 
-  function _anCorr(data) {
+  function _anCorr() {
     const ctx = document.getElementById('an-corr');
-    if (!ctx || !data.length) return;
+    if (!ctx || !_corrData.length) return;
+
+    // calcula campo% dinamicamente para 2024 com os partidos selecionados
+    const calcCampoPct = zona => {
+      if (!_votosPartidoZe) return null;
+      const zd = (_votosPartidoZe['2024'] || {})[String(zona)] || {};
+      const total = zd._total || 0;
+      if (!total) return null;
+      const campo = [..._campoPartidos].reduce((s, p) => s + (zd[p] || 0), 0);
+      return Math.round(campo / total * 1000) / 10;
+    };
+
+    const points = _corrData.map(d => {
+      const campoPct = calcCampoPct(d.zona) ?? Number(d['Campo Pct']) || 0;
+      return {
+        x: Number(d['Superior Completo']) || 0,
+        y: campoPct,
+        zona: String(d.zona).padStart(4,'0'),
+      };
+    });
+
     Charts.scatter(ctx, [{
       label: 'ZE',
-      data: data.map(d => ({
-        x: Number(d['Superior Completo']) || 0,
-        y: Number(d['Campo Pct'])         || 0,
-        zona: String(d.zona).padStart(4,'0'),
-      })),
+      data: points,
       backgroundColor: '#7C3AED',
       pointRadius: 9,
       pointHoverRadius: 11,
     }], {
       pct: true,
       xLabel: '% Superior Completo',
-      yLabel: '% Campo',
+      yLabel: '% Campo (2024)',
       tooltipFn: r => `ZE ${r.zona} — ${r.y.toFixed(1)}% campo · ${r.x.toFixed(1)}% superior`,
     });
   }
